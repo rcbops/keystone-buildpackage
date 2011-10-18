@@ -1,0 +1,9 @@
+{
+    "roles":{
+        "values":[{
+                "id":"compute:admin"
+            }
+        ],
+        "links":[]
+    }
+}

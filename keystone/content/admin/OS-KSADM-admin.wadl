@@ -1,0 +1,546 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- (C) 2011 OpenStack LLC., All Rights Reserved -->
+<!--*******************************************************-->
+<!--         Import Common XML Entities                    -->
+<!--                                                       -->
+<!--     You can resolve the entites with xmllint          -->
+<!--                                                       -->
+<!--        xmllint -noent OS-KSADM-admin.wadl             -->
+<!--*******************************************************-->
+<!DOCTYPE application [
+<!ENTITY % common  SYSTEM "../common/common.ent">
+%common;
+]>
+
+<application xmlns="http://wadl.dev.java.net/2009/02"
+	xmlns:identity="http://docs.openstack.org/identity/api/v2.0"
+	xmlns:OS-KSADM="http://docs.openstack.org/identity/api/ext/OS-KSADM/v1.0"	
+	xmlns:capi="http://docs.openstack.org/common/api/v2.0"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+	xsi:schemaLocation="http://docs.openstack.org/identity/api/v2.0 ../common/xsd/api.xsd
+		http://docs.openstack.org/common/api/v1.0 ../common/xsd/api-common.xsd
+		http://wadl.dev.java.net/2009/02 http://www.w3.org/Submission/wadl/wadl.xsd
+		http://docs.openstack.org/identity/api/ext/OS-KSADM/v1.0 ../common/xsd/OS-KSADM.xsd
+		">
+
+    <grammars>
+        <include href="../common/xsd/api.xsd"/>
+        <include href="../common/xsd/api-common.xsd"/>
+        <include href="../common/xsd/OS-KSADM.xsd" />
+    </grammars>
+    <!--*******************************************************-->
+    <!--             All Resoruces                             -->
+    <!--*******************************************************-->
+
+    <!-- We should use SSL in production -->
+    <resources base="http://localhost:5001">
+        <resource id="version" path="v2.0">
+            <param name="X-Auth-Token" style="header" type="xsd:string" required="true">
+                <doc>You need a valid admin token for access.</doc>
+            </param>            
+            <resource id="users" path="users">
+                <method href="#addUser"/>
+                <resource id="userById" path="{userId}">
+                    <method href="#updateUser"/>
+                    <method href="#deleteUser"/>
+                    <resource id="user-OS-KSADM" path="OS-KSADM">
+                        <resource id="enabled" path="enabled">
+                            <method href="#setUserEnabled"/>
+                        </resource>
+                        
+                        <resource id="userRoles" path="roles">
+                            <method href="#listUserRoles"/>
+                            <resource id="userRoleById" path="{roleId}">
+                                <param name="roleId" style="template" type="xsd:int"/>
+                                <method href="#addUserRole"/>
+                                <method href="#getUserRole"/>
+                                <method href="#deleteUserRole"/>
+                            </resource>
+                        </resource>
+                        
+                        <resource id="userCredentials" path="credentials">
+                            <method href="#addUserCredential"/>
+                            <method href="#listCredentials"/>
+                            <resource id="userCredentialsByType" path="{credentialType}">
+                                <method href="#listCredentialsByType"/>
+                            </resource>
+                            <resource id="userCredentialByTypeAndId" path="{credentialTypeAndId}">
+                                <param name="credentialTypeAndId" style="template" type="xsd:string"/>
+                                <method href="#updateUserCredential"/>
+                                <method href="#getUserCredential"/>
+                            </resource>
+                        </resource>
+                    </resource>
+                </resource>
+            </resource>
+
+            <resource id="tenants" path="tenants">
+				<method href="#addTenant"/>
+                <resource id="tenantById" path="{tenantId}">
+                    <param name="tenantId" style="template" type="xsd:string"/>
+                    <method href="#updateTenant"/>
+                    <method href="#deleteTenant"/>
+                    <resource id="tenant-OS-KSADM" path="OS-KSADM">
+                        <resource id="rolesForTenant" path="roles">
+                            <method href="#listRolesForTenant"/>
+                        </resource>
+    
+                        <resource id="usersForTenant" path="users">
+                            <method href="#listUsersForTenant"/>
+                            <method href="#listUsersWithRoleForTenant"/>
+                            <resource id="userForTenant" path="{userId}">
+                                <param name="userId" style="template" type="xsd:string"/>
+                                <resource id="userRolesForTenant" path="roles">
+                                    <resource id="role" path="{roleId}">
+                                        <method href="#addRolesToUserOnTenant"/>
+                                        <method href="#deleteRoleFromUserOnTenant"/>
+                                    </resource>
+                                </resource>
+                            </resource>
+                       </resource>
+                    </resource>
+                </resource>
+            </resource>
+
+            <resource id="role-service-OS-KSADM" path="OS-KSADM">
+                <resource id="roles" path="roles">
+                    <method href="#listRoles"/>
+                    <resource id="roleId" path="{roleId}">
+                        <param name="roleId" style="template" type="xsd:string"/>
+                        <method href="#addRole"/>
+                        <method href="#getRole"/>
+                        <method href="#deleteRole"/>
+                    </resource>
+                </resource>
+                <resource id="services" path="services">
+                    <method href="#listServices"/>
+                    <method href="#addService"/>
+                    
+                    <resource id="serviceId" path="{serviceId}">
+                        <param name="serviceId" style="template" type="xsd:int"/>
+                        <method href="#getService"/>
+                        <method href="#deleteService"/>
+                    </resource>
+                </resource>
+            </resource>
+        </resource>
+    </resources>
+
+    <!--*******************************************************-->
+    <!--               All Methods                             -->
+    <!--*******************************************************-->
+
+    <!-- Tenant Operations -->
+    <method name="GET" id="listTenants">
+        <doc xml:lang="EN" title="List Tenants">
+            <p xmlns="http://www.w3.org/1999/xhtml">Lists all tenants.</p>
+        </doc>
+        <request>
+            <param name="marker" style="query" required="false" type="xsd:string"/>
+            <param name="limit" style="query" required="false" type="xsd:int"/>
+        </request>
+        <response status="200 203">
+            <representation mediaType="application/xml" element="identity:tenants"/>
+            <representation mediaType="application/json"/>
+        </response>
+        &commonFaults;
+        &getFaults;
+    </method>
+    
+    <method name="POST" id="addTenant">
+        <doc xml:lang="EN" title="Create a Tenant">
+            <p xmlns="http://www.w3.org/1999/xhtml">Creates a tenant.</p>
+        </doc>
+        <request>
+            <representation mediaType="application/xml" element="identity:tenant"/>
+            <representation mediaType="application/json"/>
+        </request>
+        <response status="201">
+            <representation mediaType="application/xml" element="identity:tenant"/>
+            <representation mediaType="application/json"/>
+        </response>
+        &commonFaults;
+        &postPutFaults;
+    </method>
+
+    <method name="PUT" id="updateTenant">
+        <doc xml:lang="EN" title="Update a Tenant">
+            <p xmlns="http://www.w3.org/1999/xhtml">Updates a tenant.</p>
+        </doc>
+        <request>
+            <representation mediaType="application/xml" element="identity:tenant"/>
+            <representation mediaType="application/json"/>
+        </request>
+        <response status="200">
+            <representation mediaType="application/xml" element="identity:tenant"/>
+            <representation mediaType="application/json"/>
+        </response>
+        &commonFaults;
+        &getFaults;
+        &postPutFaults;
+    </method>
+
+    <method name="DELETE" id="deleteTenant">
+        <doc xml:lang="EN" title="Delete a Tenant">
+            <p xmlns="http://www.w3.org/1999/xhtml">Deletes a tenant.</p>
+        </doc>
+        <response status="204"/>
+        &commonFaults;
+        &getFaults;
+    </method>
+    
+    <method name="GET" id="listRolesForTenant">
+        <doc xml:lang="EN" title="List roles for a Tenant.">
+            <p xmlns="http://www.w3.org/1999/xhtml">Lists all the roles for a tenant.</p>
+        </doc>
+        <request>
+            <param name="marker" style="query" required="false" type="xsd:string"/>
+            <param name="limit" style="query" required="false" type="xsd:int"/>
+        </request>
+        <response status="200 203">
+            <representation mediaType="application/xml" element="identity:roles"/>
+            <representation mediaType="application/json"/>
+        </response>
+        &commonFaults;
+        &getFaults;
+    </method>
+
+    <method name="GET" id="listUsersForTenant">
+        <doc xml:lang="EN" title="List users for a Tenants">
+            <p xmlns="http://www.w3.org/1999/xhtml">Lists all the users for a tenant.</p>
+        </doc>
+        <request>
+            <param name="marker" style="query" required="false" type="xsd:string"/>
+            <param name="limit" style="query" required="false" type="xsd:int"/>
+        </request>
+        <response status="200 203">
+            <representation mediaType="application/xml" element="identity:users"/>
+            <representation mediaType="application/json"/>
+        </response>
+        &commonFaults;
+        &getFaults;
+    </method>
+    
+    <method name="GET" id="listUsersWithRoleForTenant">
+        <doc xml:lang="EN" title="List user with role for tenant.">
+            <p xmlns="http://www.w3.org/1999/xhtml">Lists all the users with a specific role for a tenant.</p>
+        </doc>
+        <request>
+            <param name="roleId" style="query" required="true" type="xsd:string"/>
+            <param name="marker" style="query" required="false" type="xsd:string"/>
+            <param name="limit" style="query" required="false" type="xsd:int"/>
+        </request>
+        <response status="200 203">
+            <representation mediaType="application/xml" element="identity:users"/>
+            <representation mediaType="application/json"/>
+        </response>
+        &commonFaults;
+        &getFaults;
+    </method>
+    
+    <method name="PUT" id="addRolesToUserOnTenant">
+        <doc xml:lang="EN" title="Add roles on a tenant.">
+            <p xmlns="http://www.w3.org/1999/xhtml">Adds a specific role to a user for a tenant.</p>
+        </doc>
+        <response status="200"/>
+        &commonFaults;
+        &postPutFaults;
+        &getFaults;
+    </method>    
+
+    <method name="DELETE" id="deleteRoleFromUserOnTenant">
+        <doc xml:lang="EN" title="Delete roles on tenant.">
+            <p xmlns="http://www.w3.org/1999/xhtml">Deletes a specific role from a user for a tenant.</p>
+        </doc>
+        <response status="204"/>
+        &commonFaults;
+        &getFaults;
+    </method>    
+    
+    <!--User Operations-->
+    <method name="POST" id="addUser">
+        <doc xml:lang="EN" title="Add user">
+            <p xmlns="http://www.w3.org/1999/xhtml">Adds a user.</p>
+        </doc>
+        <request>
+            <representation mediaType="application/xml" element="identity:user"/>
+            <representation mediaType="application/json"/>
+        </request>
+        <response status="201">
+            <representation mediaType="application/xml" element="identity:user"/>
+            <representation mediaType="application/json"/>
+        </response>
+        &commonFaults;
+        &getFaults;
+        &postPutFaults;
+    </method>
+   
+    <method name="GET" id="getUser">
+        <doc xml:lang="EN" title="Get user">
+            <p xmlns="http://www.w3.org/1999/xhtml">Get user.</p>
+        </doc>
+        <response status="200 203">
+            <representation mediaType="application/xml" element="identity:user"/>
+            <representation mediaType="application/json"/>
+        </response>
+        &commonFaults;
+        &getFaults;
+    </method>
+
+    <method name="PUT" id="updateUser">
+        <doc xml:lang="EN" title="Update user">
+            <p xmlns="http://www.w3.org/1999/xhtml">Update a user.</p>
+        </doc>
+        <request>
+            <representation mediaType="application/xml" element="identity:user"/>
+            <representation mediaType="application/json"/>
+        </request>
+        <response status="200">
+            <representation mediaType="application/xml" element="identity:user"/>
+            <representation mediaType="application/json"/>
+        </response>
+        &commonFaults;
+        &postPutFaults;
+        &getFaults;
+    </method>
+   
+    <method name="DELETE" id="deleteUser">
+        <doc xml:lang="EN" title="Delete user">
+            <p xmlns="http://www.w3.org/1999/xhtml">Delete a user.</p>
+        </doc>
+        <response status="204"/>
+        &commonFaults;
+        &getFaults;
+    </method>
+    
+    <method name="PUT" id="setUserEnabled">
+        <doc xml:lang="EN" title="Set user enabled.">
+            <p xmlns="http://www.w3.org/1999/xhtml">Enable user.</p>
+        </doc>
+        <request>
+            <representation mediaType="application/xml" element="identity:user">
+                <param name="user" style="plain" path="/" type="identity:UserWithOnlyEnabled"/>
+            </representation>
+            <representation mediaType="application/json"/>
+        </request>
+        <response status="200">
+            <representation mediaType="application/xml" element="identity:user"/>
+            <representation mediaType="application/json"/>
+        </response>
+        &commonFaults;
+        &postPutFaults;
+        &getFaults;
+    </method>
+
+    <!--User Roles-->
+    <method name="GET" id="listUserRoles">
+        <doc xml:lang="EN" title="List Roles">
+            <p xmlns="http://www.w3.org/1999/xhtml">List roles for a user.</p>
+        </doc>
+        <request>
+            <param name="serviceId" style="query" required="false" type="xsd:string"/>
+        </request>
+        <response status="200 203">
+            <representation mediaType="application/xml" element="identity:roles"/>
+            <representation mediaType="application/json"/>
+        </response>
+        &commonFaults;
+        &getFaults;
+    </method>
+    
+    <method name="PUT" id="addUserRole">
+        <doc xml:lang="EN" title="Add roles to a user.">
+            <p xmlns="http://www.w3.org/1999/xhtml">Adds a specific role to a user.</p>
+        </doc>
+        <response status="200"/>
+        &commonFaults;
+        &postPutFaults;
+        &getFaults;
+    </method>    
+    
+    <method name="GET" id="getUserRole">
+        <doc xml:lang="EN" title="Get user Role">
+            <p xmlns="http://www.w3.org/1999/xhtml">Get a role.</p>
+        </doc>
+        <response status="200 203">
+            <representation mediaType="application/xml" element="identity:role"/>
+            <representation mediaType="application/json"/>
+        </response>
+        &commonFaults;
+        &postPutFaults;
+        &getFaults;
+    </method>
+    
+    <method name="DELETE" id="deleteUserRole">
+        <doc xml:lang="EN" title="Delete roles on user.">
+            <p xmlns="http://www.w3.org/1999/xhtml">Deletes a specific role from a user.</p>
+        </doc>
+        <response status="204"/>
+        &commonFaults;
+        &getFaults;
+    </method>    
+    
+    
+    <!-- User Credentials-->
+    <method name="POST" id="addUserCredential">
+        <doc xml:lang="EN" title="Add user Credential.">
+            <p xmlns="http://www.w3.org/1999/xhtml">Adds a credential to a user.</p>
+        </doc>
+        <request>
+            <representation mediaType="application/xml" element="identity:credentials"/>
+            <representation mediaType="application/json"/>
+        </request>
+        <response status="201">
+            <representation mediaType="application/xml" element="identity:credentials"/>
+            <representation mediaType="application/json"/>
+        </response>
+        &commonFaults;
+        &postPutFaults;
+        &getFaults;
+    </method>
+
+    <method name="GET" id="listCredentials">
+        <doc xml:lang="EN" title="List Credentials">
+            <p xmlns="http://www.w3.org/1999/xhtml">List credentials.</p>
+        </doc>
+        <response status="200 203">
+            <representation mediaType="application/xml" element="identity:credentials-collection"/>
+            <representation mediaType="application/json"/>
+        </response>
+        &commonFaults;
+        &getFaults;
+    </method>
+    
+    <method name="GET" id="listCredentialsByType">
+        <doc xml:lang="EN" title="List Credentials by type">
+            <p xmlns="http://www.w3.org/1999/xhtml">List credentials by type.</p>
+        </doc>
+        <response status="200 203">
+            <representation mediaType="application/xml" element="identity:credentials-collection"/>
+            <representation mediaType="application/json"/>
+        </response>
+        &commonFaults;
+        &getFaults;
+    </method>    
+
+    <method name="POST" id="updateUserCredential">
+        <doc xml:lang="EN" title="Update user credential">
+            <p xmlns="http://www.w3.org/1999/xhtml">Update credentials.</p>
+        </doc>
+        <request>
+            <representation mediaType="application/xml" element="identity:credentials"/>
+            <representation mediaType="application/json"/>
+        </request>
+        <response status="200">
+            <representation mediaType="application/xml" element="identity:credentials"/>
+            <representation mediaType="application/json"/>
+        </response>
+        &commonFaults;
+        &postPutFaults;
+        &getFaults;
+    </method>
+    
+    <method name="GET" id="getUserCredential">
+        <doc xml:lang="EN" title="Get user Credentials">
+            <p xmlns="http://www.w3.org/1999/xhtml">Get user credentials.</p>
+        </doc>
+        <response status="200 203">
+            <representation mediaType="application/xml" element="identity:credentials"/>
+            <representation mediaType="application/json"/>
+        </response>
+        &commonFaults;
+        &getFaults;
+    </method>
+    
+    <!--Roles-->
+    <method name="GET" id="listRoles">
+        <doc xml:lang="EN" title="List Roles">
+            <p xmlns="http://www.w3.org/1999/xhtml">List roles.</p>
+        </doc>
+        <request>
+            <param name="serviceId" style="query" required="false" type="xsd:string"/>
+        </request>
+        <response status="200 203">
+            <representation mediaType="application/xml" element="identity:roles"/>
+            <representation mediaType="application/json"/>
+        </response>
+        &commonFaults;
+        &getFaults;
+    </method>
+
+    <method name="PUT" id="addRole">
+        <doc xml:lang="EN" title="Add Role">
+            <p xmlns="http://www.w3.org/1999/xhtml">Add role.</p>
+        </doc>
+        <response status="200"/>
+        &commonFaults;
+        &postPutFaults;
+        &getFaults;
+    </method>
+
+    <method name="GET" id="getRole">
+        <doc xml:lang="EN" title="Get Role">
+            <p xmlns="http://www.w3.org/1999/xhtml">Get a role.</p>
+        </doc>
+        <response status="200 203">
+            <representation mediaType="application/xml" element="identity:role"/>
+            <representation mediaType="application/json"/>
+        </response>
+        &commonFaults;
+        &postPutFaults;
+        &getFaults;
+    </method>
+    
+    <method name="DELETE" id="deleteRole">
+        <doc xml:lang="EN" title="Delete Role">
+            <p xmlns="http://www.w3.org/1999/xhtml">Delete a role.</p>
+        </doc>
+        <response status="204"/>
+        &commonFaults;
+        &getFaults;
+    </method>
+
+    <!-- Service Operations -->
+    <method name="GET" id="listServices">
+        <request>
+            <param name="serviceId" style="query" required="false" type="xsd:string"/>
+        </request>
+        <response status="200 203">
+            <representation mediaType="application/xml" element="OS-KSADM:services"/>
+            <representation mediaType="application/json"/>
+        </response>
+        &commonFaults;
+        &getFaults;
+    </method>
+    <method name="GET" id="getService">
+        <response status="200 203">
+            <representation mediaType="application/xml" element="OS-KSADM:service"/>
+            <representation mediaType="application/json"/>
+        </response>
+        &commonFaults;
+        &getFaults;
+    </method>
+    <method name="POST" id="addService">
+        <request>
+            <representation mediaType="application/xml" element="OS-KSADM:service"/>
+            <representation mediaType="application/json"/>
+        </request>
+        <response status="201">
+            <representation mediaType="application/xml" element="OS-KSADM:service">
+                <param name="Location" type="xsd:anyURI" style="header"/>
+            </representation>
+            <representation mediaType="application/json">
+                <param name="Location" type="xsd:anyURI" style="header"/>
+            </representation>
+        </response>
+        &commonFaults;
+        &postPutFaults;
+        &getFaults;
+    </method>
+    <method name="DELETE" id="deleteService">
+        <response status="204"/>
+        &commonFaults;
+        &getFaults;
+    </method>
+</application>
