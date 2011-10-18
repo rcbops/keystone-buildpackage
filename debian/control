@@ -1,0 +1,47 @@
+Source: keystone
+Section: python
+Priority: optional
+Maintainer: Rackspace
+Build-Depends: debhelper (>= 7.0.50),
+ python-all,
+ python-all-dev,
+ sqlite3
+Build-Depends-Indep:
+ python-support (>= 0.6),
+ python-setuptools,
+ python-pastedeploy,
+ python-pysqlite2,
+ python-eventlet,
+ python-sqlalchemy-ext | python-sqlalchemy ( << 0.6.3-2),
+ python-routes,
+ python-webob,
+ python-lxml
+XS-Python-Version: >=2.6
+Standards-Version: 3.9.1
+
+Package: python-keystone
+Architecture: all
+Homepage: https://github.com/rackspace/keystone
+XB-Python-Version: ${python:Versions}
+Depends: ${misc:Depends},
+ ${python:Depends},
+ python-lxml
+Description: Identity Service of OpenStack
+ .
+ This package contains the python libraries
+
+Package: keystone
+Architecture: all
+Homepage: https://github.com/rackspace/keystone
+XB-Python-Version: ${python:Versions}
+Depends: ${misc:Depends}, ${python:Depends}, python-keystone (= ${source:Version}), adduser,
+ python-pastedeploy,
+ python-eventlet,
+ python-pysqlite2,
+ sqlite3,
+ python-eventlet,
+ python-sqlalchemy-ext | python-sqlalchemy ( << 0.6.3-2),
+ python-routes
+Description: Identity Service of OpenStack
+ .
+ This package contains the daemons

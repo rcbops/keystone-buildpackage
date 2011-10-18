@@ -1,0 +1,52 @@
+keystone (2011.3-d5-rcb7) natty; urgency=low
+
+  * Remove bad logging line from ec2 middleware 
+
+ -- RCB Builder <rcb-deploy@lists.rackspace.com>  Thu, 13 Oct 2011 21:25:43 -0500
+
+keystone (2011.3-d5-rcb6) natty; urgency=low
+
+  * add middleware to support paste configuration of ec2 api + keystone
+
+ -- RCB Builder <rcb-deploy@lists.rackspace.com>  Thu, 13 Oct 2011 16:52:59 -0500
+
+keystone (2011.3-d5-rcb5) natty; urgency=low
+
+  * fix sample data to include %tenant_id% endpoints
+
+ -- RCB Builder <rcb-deploy@lists.rackspace.com>  Fri, 23 Sep 2011 12:50:31 -0500
+
+keystone (2011.3-d5-rcb4) natty; urgency=low
+
+  * split keystone and python-keystone
+
+ -- RCB Builder <rcb-deploy@lists.rackspace.com>  Thu, 22 Sep 2011 15:29:16 -0500
+
+keystone (2011.3-d5-rcb3) natty; urgency=low
+
+  * fix runtime deps
+
+ -- RCB Builder <rcb-deploy@lists.rackspace.com>  Thu, 22 Sep 2011 11:02:04 -0500
+
+keystone (2011.3-d5-rcb2) natty; urgency=low
+
+  * fix default config file
+
+ -- RCB Builder <rcb-deploy@lists.rackspace.com>  Thu, 22 Sep 2011 10:35:24 -0500
+
+keystone (2011.3-d5-rcb1) natty; urgency=low
+
+  * Updated upstream source from
+    https://github.com/cloudbuilders/keystone.git, revision
+    eac83e5fa00a8357ab7981179a81a8988bcacef1 Updated debian packaging
+    from https://github.com/rpedde/debians.git, revision
+    74807909f14b247715c05e868bf70ed94f6c8bee
+
+ -- root <build@syn-n04.lab>  Tue, 13 Sep 2011 23:40:11 -0500
+
+keystone (000-000-0000) maverick; urgency=low
+
+  * Initial Commit
+
+ -- root <root@packaging>  Tue, 19 Jul 2011 22:21:31 +0000
+

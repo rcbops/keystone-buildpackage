@@ -1,0 +1,9 @@
+description "Keystone server"
+author "Vishvananda Ishaya <vishvananda@google.com>"
+
+start on (local-filesystems and net-device-up IFACE!=lo)
+stop on runlevel [016]
+
+respawn
+
+exec su -c "keystone >> /var/log/keystone/keystone.log 2>&1" keystone
