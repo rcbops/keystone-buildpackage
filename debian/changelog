@@ -1,4 +1,4 @@
-keystone (2011.3-d5-rcb7.1) natty; urgency=low
+keystone (2011.3-d5-rcb8) natty; urgency=low
 
   * Add x-rcb-component in preparation for essex-e0 drop
 
