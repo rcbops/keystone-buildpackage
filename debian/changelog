@@ -1,6 +1,12 @@
+keystone (2011.3-d5-rcb7.1) natty; urgency=low
+
+  * Add x-rcb-component in preparation for essex-e0 drop
+
+ -- RCB Builder <rcb-deply@lists.rackspace.com>  Fri, 28 Oct 2011 09:26:58 -0500
+
 keystone (2011.3-d5-rcb7) natty; urgency=low
 
-  * Remove bad logging line from ec2 middleware 
+  * Remove bad logging line from ec2 middleware
 
  -- RCB Builder <rcb-deploy@lists.rackspace.com>  Thu, 13 Oct 2011 21:25:43 -0500
 
