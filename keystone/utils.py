@@ -19,9 +19,7 @@ import os
 import sys
 import logging
 import functools
-
 from webob import Response
-
 import keystone.logic.types.fault as fault
 
 
@@ -106,7 +104,7 @@ def send_error(code, req, result):
     return resp
 
 
-def send_result(code, req, result):
+def send_result(code, req, result=None):
     content = None
 
     resp = Response()
@@ -142,17 +140,6 @@ def send_legacy_result(code, headers):
     resp.content_type_params = {'charset': 'UTF-8'}
 
     return resp
-
-
-# Currently using sha1 to hash, without a salt value.
-# Need to research relevant openstack standards.
-def get_hashed_password(password):
-    if password != None and len(password) > 0:
-        return password
-        # why is this disabled?
-        #return hashlib.sha1(password).hexdigest()
-    else:
-        return None
 
 
 def import_module(module_name, class_name=None):

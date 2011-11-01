@@ -61,9 +61,9 @@ class AuthProtocol(object):
         """ Handle incoming request. Transform. And send downstream. """
         request = Request(env)
         if env['KEYSTONE_API_VERSION'] in ['1.0', '1.1']:
-            params = {"passwordCredentials":
+            params = {"auth": {"passwordCredentials":
                 {"username": utils.get_auth_user(request),
-                    "password": utils.get_auth_key(request)}}
+                    "password": utils.get_auth_key(request)}}}
             #Make request to keystone
             new_request = Request.blank('/tokens')
             new_request.method = 'POST'
@@ -85,8 +85,8 @@ class AuthProtocol(object):
     def __transform_headers(self, content):
         """Transform Keystone auth to legacy headers"""
         headers = {}
-        if "auth" in content:
-            auth = content["auth"]
+        if "access" in content:
+            auth = content["access"]
             if "token" in auth:
                 headers["X-Auth-Token"] = auth["token"]["id"]
             if "serviceCatalog" in auth:
@@ -94,9 +94,9 @@ class AuthProtocol(object):
                 service_mappings = ast.literal_eval(
                     self.conf["service-header-mappings"])
                 for service in services:
-                    service_name = service
+                    service_name = service["name"]
                     service_urls = ''
-                    for endpoint in services[service_name]:
+                    for endpoint in service["endpoints"]:
                         if len(service_urls) > 0:
                             service_urls += ','
                         service_urls += endpoint["publicURL"]

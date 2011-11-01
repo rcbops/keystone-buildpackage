@@ -15,15 +15,15 @@
 
 import json
 from lxml import etree
-import string
 
 from keystone.logic.types import fault
 
 
 class Role(object):
-    def __init__(self, role_id, desc, service_id=None):
-        self.role_id = role_id
-        self.desc = desc
+    def __init__(self, id, name, description, service_id=None):
+        self.id = id
+        self.name = name
+        self.description = description
         self.service_id = service_id
 
     @staticmethod
@@ -35,12 +35,13 @@ class Role(object):
                 "role")
             if root == None:
                 raise fault.BadRequestFault("Expecting Role")
-            role_id = root.get("id")
-            desc = root.get("description")
-            if role_id == None:
-                raise fault.BadRequestFault("Expecting Role")
+            id = root.get("id")
+            name = root.get("name")
+            description = root.get("description")
+            if name is None:
+                raise fault.BadRequestFault("Expecting Role name")
             service_id = root.get("serviceId")
-            return Role(role_id, desc, service_id)
+            return Role(id, name, description, service_id)
         except etree.LxmlError as e:
             raise fault.BadRequestFault("Cannot parse Role", str(e))
 
@@ -51,36 +52,30 @@ class Role(object):
             if not "role" in obj:
                 raise fault.BadRequestFault("Expecting Role")
             role = obj["role"]
-            if not "id" in role:
-                role_id = None
-            else:
-                role_id = role["id"]
-            if role_id == None:
-                raise fault.BadRequestFault("Expecting Role")
 
-            if not "description" in role:
-                desc = None
-            else:
-                desc = role["description"]
+            id = role.get('id')
+            name = role.get('name')
+            description = role.get('description')
+            service_id = role.get('serviceId')
 
-            if not "serviceId" in role:
-                service_id = None
-            else:
-                service_id = role["serviceId"]
+            if name is None:
+                raise fault.BadRequestFault("Expecting Role name")
 
-            return Role(role_id, desc, service_id)
+            return Role(id, name, description, service_id)
         except (ValueError, TypeError) as e:
             raise fault.BadRequestFault("Cannot parse Role", str(e))
 
     def to_dom(self):
         dom = etree.Element("role",
                         xmlns="http://docs.openstack.org/identity/api/v2.0")
-        if self.role_id:
-            dom.set("id", self.role_id)
-        if self.desc:
-            dom.set("description", string.lower(str(self.desc)))
+        if self.id:
+            dom.set("id", unicode(self.id))
+        if self.name:
+            dom.set("name", unicode(self.name))
+        if self.description:
+            dom.set("description", unicode(self.description))
         if self.service_id:
-            dom.set("serviceId", str(self.service_id))
+            dom.set("serviceId", unicode(self.service_id))
         return dom
 
     def to_xml(self):
@@ -88,12 +83,14 @@ class Role(object):
 
     def to_dict(self):
         role = {}
-        if self.role_id:
-            role["id"] = self.role_id
-        if self.desc:
-            role["description"] = self.desc
+        if self.id:
+            role["id"] = unicode(self.id)
+        if self.name:
+            role["name"] = unicode(self.name)
+        if self.description:
+            role["description"] = unicode(self.description)
         if self.service_id:
-            role["serviceId"] = self.service_id
+            role["serviceId"] = unicode(self.service_id)
         return {'role': role}
 
     def to_json(self):
@@ -137,49 +134,46 @@ class RoleRef(object):
             dom = etree.Element("root")
             dom.append(etree.fromstring(xml_str))
             root = dom.find("{http://docs.openstack.org/identity/api/v2.0}" \
-                            "roleRef")
+                            "role")
             if root == None:
-                raise fault.BadRequestFault("Expecting RoleRef")
+                raise fault.BadRequestFault("Expecting Role")
             role_id = root.get("roleId")
             tenant_id = root.get("tenantId")
             if role_id == None:
                 raise fault.BadRequestFault("Expecting Role")
             return RoleRef('', role_id, tenant_id)
         except etree.LxmlError as e:
-            raise fault.BadRequestFault("Cannot parse RoleRef", str(e))
+            raise fault.BadRequestFault("Cannot parse Role", str(e))
 
     @staticmethod
     def from_json(json_str):
         try:
             obj = json.loads(json_str)
-            if not "roleRef" in obj:
-                raise fault.BadRequestFault("Expecting Role Ref")
-            role_ref = obj["roleRef"]
-            if not "roleId" in role_ref:
-                role_id = None
-            else:
-                role_id = role_ref["roleId"]
-            if role_id == None:
+            if not "role" in obj:
                 raise fault.BadRequestFault("Expecting Role")
-            if not "tenantId" in role_ref:
-                tenant_id = None
-            else:
-                tenant_id = role_ref["tenantId"]
+            role_ref = obj["role"]
+
+            role_id = role_ref.get('roleId')
+            tenant_id = role_ref.get('tenantId')
+
+            if role_id == None:
+                raise fault.BadRequestFault("Expecting Role ID")
             if tenant_id == None:
-                raise fault.BadRequestFault("Expecting Tenant")
+                raise fault.BadRequestFault("Expecting Tenant ID")
+
             return RoleRef('', role_id, tenant_id)
         except (ValueError, TypeError) as e:
             raise fault.BadRequestFault("Cannot parse Role", str(e))
 
     def to_dom(self):
-        dom = etree.Element("roleRef",
+        dom = etree.Element("role",
                         xmlns="http://docs.openstack.org/identity/api/v2.0")
         if self.role_ref_id:
-            dom.set("id", str(self.role_ref_id))
+            dom.set("id", unicode(self.role_ref_id))
         if self.role_id:
-            dom.set("roleId", self.role_id)
+            dom.set("roleId", unicode(self.role_id))
         if self.tenant_id:
-            dom.set("tenantId", self.tenant_id)
+            dom.set("tenantId", unicode(self.tenant_id))
         return dom
 
     def to_xml(self):
@@ -188,12 +182,12 @@ class RoleRef(object):
     def to_dict(self):
         role_ref = {}
         if self.role_ref_id:
-            role_ref["id"] = self.role_ref_id
+            role_ref["id"] = unicode(self.role_ref_id)
         if self.role_id:
-            role_ref["roleId"] = self.role_id
+            role_ref["roleId"] = unicode(self.role_id)
         if self.tenant_id:
-            role_ref["tenantId"] = self.tenant_id
-        return {'roleRef': role_ref}
+            role_ref["tenantId"] = unicode(self.tenant_id)
+        return {'role': role_ref}
 
     def to_json(self):
         return json.dumps(self.to_dict())
@@ -211,7 +205,7 @@ class RoleRefs(object):
         return etree.tostring(dom)
 
     def to_dom(self):
-        dom = etree.Element("roleRefs")
+        dom = etree.Element("roles")
         dom.set(u"xmlns", "http://docs.openstack.org/identity/api/v2.0")
 
         for t in self.values:
@@ -223,10 +217,91 @@ class RoleRefs(object):
         return dom
 
     def to_json(self):
-        values = [t.to_dict()["roleRef"] for t in self.values]
+        values = [t.to_dict()["role"] for t in self.values]
         links = [t.to_dict()["links"] for t in self.links]
-        return json.dumps({"roleRefs": {"values": values, "links": links}})
+        return json.dumps({"roles": {"values": values, "links": links}})
 
     def to_json_values(self):
-        values = [t.to_dict()["roleRef"] for t in self.values]
+        values = [t.to_dict()["role"] for t in self.values]
         return values
+
+
+class UserRole(object):
+    """A role granted to a user"""
+
+    def __init__(self, role_id, role_name, tenant_id):
+        self.role_id = role_id
+        self.role_name = role_name
+        self.tenant_id = tenant_id
+
+    @staticmethod
+    def from_xml(xml_str):
+        try:
+            dom = etree.Element("root")
+            dom.append(etree.fromstring(xml_str))
+
+            root = dom.find("{http://docs.openstack.org/identity/api/v2.0}" \
+                            "role")
+            if root == None:
+                raise fault.BadRequestFault("Expecting Role")
+
+            role_id = root.get("id")
+            role_name = root.get("name")
+            tenant_id = root.get("tenantId")
+
+            if role_id is None:
+                raise fault.BadRequestFault("Expecting Role ID")
+
+            return UserRole(role_id, role_name, tenant_id)
+        except etree.LxmlError as e:
+            raise fault.BadRequestFault("Cannot parse Role", str(e))
+
+    @staticmethod
+    def from_json(json_str):
+        try:
+            obj = json.loads(json_str)
+            if not "role" in obj:
+                raise fault.BadRequestFault("Expecting Role")
+            role = obj["role"]
+
+            role_id = role.get('id')
+            role_name = role.get('name')
+            tenant_id = role.get('tenantId')
+
+            if role_id is None:
+                raise fault.BadRequestFault("Expecting Role ID")
+
+            return RoleRef(role_id, role_name, tenant_id)
+        except (ValueError, TypeError) as e:
+            raise fault.BadRequestFault("Cannot parse Role", str(e))
+
+    def to_dom(self):
+        dom = etree.Element("role",
+                        xmlns="http://docs.openstack.org/identity/api/v2.0")
+        if self.role_id:
+            dom.set("id", unicode(self.role_id))
+        if self.role_name:
+            dom.set("name", unicode(self.role_name))
+        if self.tenant_id:
+            dom.set("tenantId", unicode(self.tenant_id))
+        return dom
+
+    def to_xml(self):
+        return etree.tostring(self.to_dom())
+
+    def to_dict(self):
+        role = {}
+        if self.role_id:
+            role["id"] = unicode(self.role_id)
+        if self.role_name:
+            role["name"] = unicode(self.role_name)
+        if self.tenant_id:
+            role["tenantId"] = unicode(self.tenant_id)
+        return {'role': role}
+
+    def to_json(self):
+        return json.dumps(self.to_dict())
+
+
+class UserRoles(RoleRefs):
+    "A collection of roles granted to a user."

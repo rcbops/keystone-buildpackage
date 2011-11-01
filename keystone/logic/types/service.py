@@ -15,30 +15,36 @@
 
 import json
 from lxml import etree
-import string
 
 from keystone.logic.types import fault
 
 
 class Service(object):
-    def __init__(self, service_id, desc):
-        self.service_id = service_id
-        self.desc = desc
+    def __init__(self, id, name, type, description):
+        self.id = id
+        self.name = name
+        self.type = type
+        self.description = description
 
     @staticmethod
     def from_xml(xml_str):
         try:
             dom = etree.Element("root")
             dom.append(etree.fromstring(xml_str))
-            root = dom.find("{http://docs.openstack.org/identity/api/v2.0}" \
-                            "service")
+            root = dom.find(
+                "{http://docs.openstack.org/identity/api/ext/OS-KSADM/v1.0}"\
+                "service")
             if root == None:
                 raise fault.BadRequestFault("Expecting Service")
-            service_id = root.get("id")
-            desc = root.get("description")
-            if service_id == None:
+            id = root.get("id")
+            name = root.get("name")
+            type = root.get("type")
+            description = root.get("description")
+            if name is None:
                 raise fault.BadRequestFault("Expecting Service")
-            return Service(service_id, desc)
+            if type == None:
+                raise fault.BadRequestFault("Expecting Service Type")
+            return Service(id, name, type, description)
         except etree.LxmlError as e:
             raise fault.BadRequestFault("Cannot parse service", str(e))
 
@@ -46,27 +52,36 @@ class Service(object):
     def from_json(json_str):
         try:
             obj = json.loads(json_str)
-            if not "service" in obj:
+            if not "OS-KSADM:service" in obj:
                 raise fault.BadRequestFault("Expecting service")
-            service = obj["service"]
-            if not "id" in service:
-                service_id = None
-            else:
-                service_id = service["id"]
-            if service_id == None:
+
+            service = obj["OS-KSADM:service"]
+            id = service.get('id')
+            name = service.get('name')
+            type = service.get('type')
+            description = service.get('description')
+
+            if name is None:
                 raise fault.BadRequestFault("Expecting service")
-            desc = service["description"]
-            return Service(service_id, desc)
+
+            if type is None:
+                raise fault.BadRequestFault("Expecting Service Type")
+
+            return Service(id, name, type, description)
         except (ValueError, TypeError) as e:
             raise fault.BadRequestFault("Cannot parse service", str(e))
 
     def to_dom(self):
         dom = etree.Element("service",
-                        xmlns="http://docs.openstack.org/identity/api/v2.0")
-        if self.service_id:
-            dom.set("id", self.service_id)
-        if self.desc:
-            dom.set("description", string.lower(str(self.desc)))
+            xmlns="http://docs.openstack.org/identity/api/ext/OS-KSADM/v1.0")
+        if self.id:
+            dom.set("id", unicode(self.id))
+        if self.name:
+            dom.set("name", unicode(self.name))
+        if self.type:
+            dom.set("type", unicode(self.type))
+        if self.description:
+            dom.set("description", unicode(self.description).lower())
         return dom
 
     def to_xml(self):
@@ -74,11 +89,15 @@ class Service(object):
 
     def to_dict(self):
         service = {}
-        if self.service_id:
-            service["id"] = self.service_id
-        if self.desc:
-            service["description"] = self.desc
-        return {'service': service}
+        if self.id:
+            service["id"] = unicode(self.id)
+        if self.name:
+            service["name"] = unicode(self.name)
+        if self.type:
+            service["type"] = unicode(self.type)
+        if self.description:
+            service["description"] = unicode(self.description).lower()
+        return {'OS-KSADM:service': service}
 
     def to_json(self):
         return json.dumps(self.to_dict())
@@ -93,7 +112,8 @@ class Services(object):
 
     def to_xml(self):
         dom = etree.Element("services")
-        dom.set(u"xmlns", "http://docs.openstack.org/identity/api/v2.0")
+        dom.set(u"xmlns",
+            "http://docs.openstack.org/identity/api/ext/OS-KSADM/v1.0")
 
         for t in self.values:
             dom.append(t.to_dom())
@@ -104,6 +124,7 @@ class Services(object):
         return etree.tostring(dom)
 
     def to_json(self):
-        values = [t.to_dict()["service"] for t in self.values]
-        links = [t.to_dict()["links"] for t in self.links]
-        return json.dumps({"services": {"values": values, "links": links}})
+        services = [t.to_dict()["OS-KSADM:service"] for t in self.values]
+        services_links = [t.to_dict()["links"] for t in self.links]
+        return json.dumps({"OS-KSADM:services": services,
+            "OS-KSADM:services_links": services_links})

@@ -21,13 +21,12 @@ from keystone.common import wsgi
 import keystone.backends as db
 from keystone.controllers.auth import AuthController
 from keystone.controllers.endpointtemplates import EndpointTemplatesController
-from keystone.controllers.roles import RolesController
-from keystone.controllers.services import ServicesController
 from keystone.controllers.staticfiles import StaticFilesController
 from keystone.controllers.tenant import TenantController
 from keystone.controllers.user import UserController
 from keystone.controllers.version import VersionController
 from keystone.controllers.extensions import ExtensionsController
+import keystone.contrib.extensions.admin as extension
 
 
 class AdminApi(wsgi.Router):
@@ -47,22 +46,29 @@ class AdminApi(wsgi.Router):
                         action="validate_token",
                         conditions=dict(method=["GET"]))
         mapper.connect("/tokens/{token_id}", controller=auth_controller,
+                        action="check_token",
+                        conditions=dict(method=["HEAD"]))
+        mapper.connect("/tokens/{token_id}", controller=auth_controller,
                         action="delete_token",
                         conditions=dict(method=["DELETE"]))
+        mapper.connect("/tokens/{token_id}/endpoints",
+                        controller=auth_controller,
+                        action="endpoints",
+                        conditions=dict(method=["GET"]))
 
         # Tenant Operations
         tenant_controller = TenantController(options)
         mapper.connect("/tenants", controller=tenant_controller,
                     action="create_tenant",
-                    conditions=dict(method=["PUT", "POST"]))
+                    conditions=dict(method=["POST"]))
         mapper.connect("/tenants", controller=tenant_controller,
                     action="get_tenants", conditions=dict(method=["GET"]))
         mapper.connect("/tenants/{tenant_id}",
                     controller=tenant_controller,
-                    action="get_tenant", conditions=dict(method=["GET"]))
+                    action="update_tenant", conditions=dict(method=["PUT"]))
         mapper.connect("/tenants/{tenant_id}",
                     controller=tenant_controller,
-                    action="update_tenant", conditions=dict(method=["PUT"]))
+                    action="get_tenant", conditions=dict(method=["GET"]))
         mapper.connect("/tenants/{tenant_id}",
                     controller=tenant_controller,
                     action="delete_tenant", conditions=dict(method=["DELETE"]))
@@ -72,7 +78,7 @@ class AdminApi(wsgi.Router):
         mapper.connect("/users",
                     controller=user_controller,
                     action="create_user",
-                    conditions=dict(method=["PUT", "POST"]))
+                    conditions=dict(method=["POST"]))
         mapper.connect("/users",
                     controller=user_controller,
                     action="get_users",
@@ -107,26 +113,6 @@ class AdminApi(wsgi.Router):
                     action="get_tenant_users",
                     conditions=dict(method=["GET"]))
 
-        #Roles
-        roles_controller = RolesController(options)
-        mapper.connect("/roles", controller=roles_controller,
-                    action="create_role", conditions=dict(method=["POST"]))
-        mapper.connect("/roles", controller=roles_controller,
-                    action="get_roles", conditions=dict(method=["GET"]))
-        mapper.connect("/roles/{role_id}", controller=roles_controller,
-                    action="get_role", conditions=dict(method=["GET"]))
-        mapper.connect("/roles/{role_id}", controller=roles_controller,
-            action="delete_role", conditions=dict(method=["DELETE"]))
-        mapper.connect("/users/{user_id}/roleRefs",
-            controller=roles_controller, action="get_role_refs",
-            conditions=dict(method=["GET"]))
-        mapper.connect("/users/{user_id}/roleRefs",
-            controller=roles_controller, action="create_role_ref",
-            conditions=dict(method=["POST"]))
-        mapper.connect("/users/{user_id}/roleRefs/{role_ref_id}",
-            controller=roles_controller, action="delete_role_ref",
-            conditions=dict(method=["DELETE"]))
-
         #EndpointTemplatesControllers and Endpoints
         endpoint_templates_controller = EndpointTemplatesController(options)
         mapper.connect("/endpointTemplates",
@@ -137,15 +123,15 @@ class AdminApi(wsgi.Router):
             controller=endpoint_templates_controller,
                 action="add_endpoint_template",
                     conditions=dict(method=["POST"]))
-        mapper.connect("/endpointTemplates/{endpoint_templates_id}",
+        mapper.connect("/endpointTemplates/{endpoint_template_id}",
                 controller=endpoint_templates_controller,
                     action="get_endpoint_template",
                         conditions=dict(method=["GET"]))
-        mapper.connect("/endpointTemplates/{endpoint_templates_id}",
+        mapper.connect("/endpointTemplates/{endpoint_template_id}",
                 controller=endpoint_templates_controller,
                     action="modify_endpoint_template",
                         conditions=dict(method=["PUT"]))
-        mapper.connect("/endpointTemplates/{endpoint_templates_id}",
+        mapper.connect("/endpointTemplates/{endpoint_template_id}",
                 controller=endpoint_templates_controller,
                     action="delete_endpoint_template",
                         conditions=dict(method=["DELETE"]))
@@ -158,7 +144,7 @@ class AdminApi(wsgi.Router):
                      action="add_endpoint_to_tenant",
                      conditions=dict(method=["POST"]))
         mapper.connect(
-                "/tenants/{tenant_id}/endpoints/{endpoints_id}",
+                "/tenants/{tenant_id}/endpoints/{endpoint_id}",
                 controller=endpoint_templates_controller,
                 action="remove_endpoint_from_tenant",
                 conditions=dict(method=["DELETE"]))
@@ -226,23 +212,5 @@ class AdminApi(wsgi.Router):
                     action="get_static_file",
                     root="content/common/", path="samples/",
                     conditions=dict(method=["GET"]))
-
-        # Services Controller
-        services_controller = ServicesController(options)
-        mapper.connect("/services",
-                    controller=services_controller,
-                    action="get_services",
-                    conditions=dict(method=["GET"]))
-        mapper.connect("/services",
-                    controller=services_controller,
-                    action="create_service",
-                    conditions=dict(method=["POST"]))
-        mapper.connect("/services/{service_id}",
-                    controller=services_controller,
-                    action="delete_service",
-                    conditions=dict(method=["DELETE"]))
-        mapper.connect("/services/{service_id}",
-                    controller=services_controller,
-                    action="get_service",
-                    conditions=dict(method=["GET"]))
+        extension.configure_extensions(mapper, options)
         super(AdminApi, self).__init__(mapper)
