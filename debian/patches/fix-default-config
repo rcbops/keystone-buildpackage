@@ -9,7 +9,7 @@
  
  # List of backends to be configured
  backends = keystone.backends.sqlalchemy
-@@ -48,7 +48,7 @@
+@@ -51,7 +51,7 @@
  # SQLAlchemy connection string for the reference implementation registry
  # server. Any valid SQLAlchemy connection string is fine.
  # See: http://bit.ly/ideIpI
