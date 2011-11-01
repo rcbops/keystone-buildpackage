@@ -11,7 +11,7 @@ This initial proof of concept aims to address the current use cases in Swift and
 
 ## User Guide & Concepts
 
-The [`Developer Guide`](https://github.com/rackspace/keystone/raw/master/keystone/content/identitydevguide.pdf) 
+The [`Developer Guide`](https://github.com/openstack/keystone/raw/master/keystone/content/identitydevguide.pdf) 
 documents the APIs to call and how to use them.
 
 #### Core Concepts:
@@ -169,7 +169,7 @@ Users of the Keystone API are often developers making ReSTfull calls to Keystone
 information is therefore called a `Developer Guide`. Developer in this case is not to be confused with developers
 working on the Keystone source code itself.
 
-The [dev guide](https://github.com/rackspace/keystone/raw/master/keystone/content/identitydevguide.pdf) is automatically
+The [dev guide](https://github.com/openstack/keystone/raw/master/keystone/content/identitydevguide.pdf) is automatically
 generated from XML and other artifacts that live in the [OpenStack Manuals project](https://launchpad.net/openstack-manuals).
 
 To build the Developer Guide from source, you need [Maven](http://maven.apache.org/). To build the docs and publish a new PDF:
@@ -201,15 +201,15 @@ in troubleshooting:
 <pre>
     # Get an unscoped token
     
-    $ curl -d '{"passwordCredentials": {"username": "joeuser", "password": "secrete"}}' -H "Content-type: application/json" http://localhost:5000/v2.0/tokens
+    $ curl -d '{"auth": {"passwordCredentials": {"username": "joeuser", "password": "secrete"}}}' -H "Content-type: application/json" http://localhost:5000/v2.0/tokens
 
     # Get a token for a tenant
 
-    $ curl -d '{"passwordCredentials": {"username": "joeuser", "password": "secrete", "tenantId": "1234"}}' -H "Content-type: application/json" http://localhost:5000/v2.0/tokens
+    $ curl -d '{"auth": {"passwordCredentials": {"username": "joeuser", "password": "secrete"}, "tenantName": "customer-x"}}' -H "Content-type: application/json" http://localhost:5000/v2.0/tokens
 
     # Get an admin token
 
-    $ curl -d '{"passwordCredentials": {"username": "admin", "password": "secrete"}}' -H "Content-type: application/json" http://localhost:5001/v2.0/tokens
+    $ curl -d '{"auth": {"passwordCredentials": {"username": "admin", "password": "secrete"}}}' -H "Content-type: application/json" http://localhost:35357/v2.0/tokens
 </pre>
 
 #### Load Testing
@@ -217,11 +217,11 @@ in troubleshooting:
 <pre>
    # Create post data
 
-   $ echo '{"passwordCredentials": {"username": "joeuser", "password": "secrete", "tenantId": "1234"}}' > post_data
+   $ echo '{"auth": {"passwordCredentials": {"username": "joeuser", "password": "secrete", "tenantName": "customer-x"}}}' > post_data
 
    # Call Apache Bench
 
-   $ ab -c 30 -n 1000 -T "application/json" -p post_data http://127.0.0.1:5001/v2.0/tokens
+   $ ab -c 30 -n 1000 -T "application/json" -p post_data http://127.0.0.1:35357/v2.0/tokens
 </pre>
 
 ## NOVA Integration
@@ -230,7 +230,7 @@ Initial support for using keystone as nova's identity component has been started
 
     # clone projects
     bzr clone lp:nova
-    git clone git://github.com/rackspace/keystone.git
+    git clone git://github.com/openstack/keystone.git
 
     # link keystone into the nova root dir
     ln -s keystone/keystone nova/keystone
@@ -254,7 +254,7 @@ Assuming you added the test data using bin/sampledata, you can then use joeuser/
 
 2.  Obtain and install a source copy of Keystone:
 
-        $ git clone https://github.com/rackspace/keystone.git ~/keystone
+        $ git clone https://github.com/openstack/keystone.git ~/keystone
         ...
         $ cd ~/keystone && sudo python setup.py develop
         ...
@@ -264,7 +264,7 @@ Assuming you added the test data using bin/sampledata, you can then use joeuser/
         $ cd ~/keystone/bin && ./keystone
         Starting the Legacy Authentication component
         Service API listening on 0.0.0.0:5000
-        Admin API listening on 0.0.0.0:5001
+        Admin API listening on 0.0.0.0:35357
 
 4.  In another window, edit the `~/keystone/keystone/test/sampledata.py` file,
     find the `swift.publicinternets.com` text and replace it with the URL to
@@ -295,7 +295,7 @@ Assuming you added the test data using bin/sampledata, you can then use joeuser/
         use = egg:keystone#tokenauth
         auth_protocol = http
         auth_host = 127.0.0.1
-        auth_port = 5001
+        auth_port = 35357
         admin_token = 999888777666
         delay_auth_decision = 0
         service_protocol = http

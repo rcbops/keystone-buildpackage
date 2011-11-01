@@ -1,29 +1,31 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <access xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-xsi:schemaLocation="http://docs.openstack.org/identity/api/v2.0 ../xsd/api.xsd"
 xmlns="http://docs.openstack.org/identity/api/v2.0">
-	<token expires="2010-11-01T03:32:15-05:00"
-	id="ab48a9efdfedb23ty3494"/>
+	<token id="ab48a9efdfedb23ty3494" expires="2010-11-01T03:32:15-05:00">
+		<tenant id="456" name="My Project" />
+	</token>
 	<user id="testId" name="test">
 		<roles>
-			<role id="compute:admin"/>
+			<role id="123" name="compute:admin"/>
+			<role id="234" name="object-store:admin" tenantId="1"/>
 		</roles>
 	</user>
 	<serviceCatalog>
 		<service type="compute" name="Computers in the Cloud">
 			<endpoint
+            tenantId="3456"
 			region="North"
-			tenantId="1234"
 			publicURL="https://north.compute.public.com/v2.0/1234"
 			internalURL="https://north.compute.internal.com/v2.0/1234">
 				<version
 				id="2.0"
 				info="https://north.compute.public.com/v2.0/"
-				list="https://north.compute.public.com/" />
+				list="https://north.compute.public.com/" 
+				tenantId="1"/>
 			</endpoint>
 			<endpoint
+            tenantId="3456"
 			region="South"
-			tenantId="1234"
 			publicURL="https://south.compute.public.com/v2.0/3456"
 			internalURL="https://south.compute.internal.com/v2.0/3456">
 				<version
@@ -34,8 +36,8 @@ xmlns="http://docs.openstack.org/identity/api/v2.0">
 		</service>
 		<service type="object-store" name="HTTP Object Store">
 			<endpoint
+            tenantId="3456"
 			region="North"
-			tenantId="1234"
 			publicURL="https://north.object-store.public.com/v1/1234"
 			internalURL="https://north.object-store.internal.com/v1/1234">
 				<version
@@ -44,8 +46,8 @@ xmlns="http://docs.openstack.org/identity/api/v2.0">
 				list="https://north.object-store.public.com/" />
 			</endpoint>
 			<endpoint
+            tenantId="3456"
 			region="South"
-			tenantId="1234"
 			publicURL="https://south.object-store.public.com/v2.0/3456"
 			internalURL="https://south.object-store.internal.com/v2.0/3456">
 				<version
@@ -56,6 +58,7 @@ xmlns="http://docs.openstack.org/identity/api/v2.0">
 		</service>
 		<service type="dnsextension:dns" name="DNS-as-a-Service">
 			<endpoint
+            tenantId="3456"
 			publicURL="https://dns.public.com/v2.0/blah-blah">
 				<version
 				id="2.0"

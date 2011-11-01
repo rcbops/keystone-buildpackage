@@ -15,10 +15,24 @@ class TenantAPI(BaseLdapAPI, BaseTenantAPI):
     model = models.Tenant
     attribute_mapping = {'desc': 'description', 'enabled': 'keystoneEnabled'}
 
-    def get_user_tenants(self, user_id):
+    def get_by_name(self, name, filter=None):
+        return self.get(name, filter)
+
+    def create(self, values):
+        values['id'] = values['name']
+        delattr(values, 'name')
+
+        return super(TenantAPI, self).create(values)
+
+    def get_user_tenants(self, user_id, include_roles=True):
         user_dn = self.api.user._id_to_dn(user_id)
         query = '(member=%s)' % (user_dn,)
-        return self.get_all(query)
+        memberships = self.get_all(query)
+        if include_roles:
+            roles = self.api.role.ref_get_all_tenant_roles(user_id)
+            for role in roles:
+                memberships.append(self.get(role.tenant_id))
+        return memberships
 
     def tenants_for_user_get_page(self, user, marker, limit):
         return self._get_page(marker, limit, self.get_user_tenants(user.id))

@@ -15,7 +15,7 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-import keystone.utils as utils
+import keystone.backends.backendutils as utils
 from keystone.backends.sqlalchemy import get_session, models, aliased, \
     joinedload
 from keystone.backends.api import BaseUserAPI
@@ -25,27 +25,31 @@ class UserAPI(BaseUserAPI):
     def get_all(self, session=None):
         if not session:
             session = get_session()
-        result = session.query(models.User)
-        return result
+        return session.query(models.User)
 
     def create(self, values):
         user_ref = models.User()
-        self.__check_and_use_hashed_password(values)
+        utils.set_hashed_password(values)
         user_ref.update(values)
         user_ref.save()
         return user_ref
 
-    def __check_and_use_hashed_password(self, values):
-        if type(values) is dict and 'password' in values.keys():
-            values['password'] = utils.get_hashed_password(values['password'])
-        elif type(values) is models.User:
-            values.password = utils.get_hashed_password(values.password)
-
     def get(self, id, session=None):
         if not session:
             session = get_session()
-        result = session.query(models.User).filter_by(id=id).first()
-        return result
+        user = session.query(models.User).filter_by(id=id).first()
+
+        return user or self.get_by_name(id, session)
+
+    def get_by_name(self, name, session=None):
+        if not session:
+            session = get_session()
+        return session.query(models.User).filter_by(name=name).first()
+
+    def get_by_email(self, email, session=None):
+        if not session:
+            session = get_session()
+        return session.query(models.User).filter_by(email=email).first()
 
     def get_page(self, marker, limit, session=None):
         if not session:
@@ -96,12 +100,6 @@ class UserAPI(BaseUserAPI):
             next_page = next_page.id
         return (prev_page, next_page)
 
-    def get_by_email(self, email, session=None):
-        if not session:
-            session = get_session()
-        result = session.query(models.User).filter_by(email=email).first()
-        return result
-
     def user_roles_by_tenant(self, user_id, tenant_id, session=None):
         if not session:
             session = get_session()
@@ -115,7 +113,7 @@ class UserAPI(BaseUserAPI):
             session = get_session()
         with session.begin():
             user_ref = self.get(id, session)
-            self.__check_and_use_hashed_password(values)
+            utils.set_hashed_password(values)
             user_ref.update(values)
             user_ref.save(session=session)
 
@@ -168,8 +166,7 @@ class UserAPI(BaseUserAPI):
     def user_get_update(self, id, session=None):
         if not session:
             session = get_session()
-        result = session.query(models.User).filter_by(id=id).first()
-        return result
+        return session.query(models.User).filter_by(id=id).first()
 
     def users_get_page(self, marker, limit, session=None):
         if not session:
@@ -252,7 +249,7 @@ class UserAPI(BaseUserAPI):
                          order_by("id").\
                          limit(limit).\
                          all()
-        user_ids = set([assoc.user_id for assoc in rv])
+        user_ids = set([str(assoc.user_id) for assoc in rv])
         users = session.query(models.User).\
                       filter("id in ('%s')" % "','".join(user_ids)).\
                       all()
@@ -312,7 +309,7 @@ class UserAPI(BaseUserAPI):
         return (prev_page, next_page)
 
     def check_password(self, user, password):
-        return user.password == utils.get_hashed_password(password)
+        return utils.check_password(password, user.password)
 
 
 def get():

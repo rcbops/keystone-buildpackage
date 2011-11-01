@@ -32,11 +32,14 @@ class ServiceAPI(BaseServiceAPI):
     def get(self, id, session=None):
         if not session:
             session = get_session()
-        result = session.query(models.Service).filter_by(id=id).first()
-        return result
+        return session.query(models.Service).filter_by(id=id).first()
+
+    def get_by_name(self, name, session=None):
+        if not session:
+            session = get_session()
+        return session.query(models.Service).filter_by(name=name).first()
 
     def get_all(self, session=None):
-        print "Enter Get All Service"
         if not session:
             session = get_session()
         return session.query(models.Service).all()

@@ -56,7 +56,7 @@ import json
 import os
 from paste.deploy import loadapp
 from urlparse import urlparse
-from webob.exc import HTTPUnauthorized, HTTPUseProxy
+from webob.exc import HTTPUnauthorized
 from webob.exc import Request, Response
 import keystone.tools.tracer  # @UnusedImport # module runs on import
 
@@ -279,18 +279,20 @@ class AuthProtocol(object):
 
         token_info = json.loads(data)
         roles = []
-        role_refs = token_info["auth"]["user"]["roleRefs"]
+        role_refs = token_info["access"]["user"]["roles"]
         if role_refs != None:
             for role_ref in role_refs:
-                roles.append(role_ref["roleId"])
+                # Nova looks for the non case-sensitive role 'Admin'
+                # to determine admin-ness
+                roles.append(role_ref["name"])
 
         try:
-            tenant = token_info['auth']['token']['tenantId']
+            tenant = token_info['access']['token']['tenant']['id']
         except:
             tenant = None
         if not tenant:
-            tenant = token_info['auth']['user']['tenantId']
-        verified_claims = {'user': token_info['auth']['user']['username'],
+            tenant = token_info['access']['user'].get('tenantId')
+        verified_claims = {'user': token_info['access']['user']['username'],
                     'tenant': tenant,
                     'roles': roles}
         return verified_claims
