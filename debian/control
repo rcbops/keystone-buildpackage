@@ -18,7 +18,7 @@ Build-Depends-Indep:
  python-lxml
 XS-Python-Version: >=2.6
 Standards-Version: 3.9.1
-XCBS-Rcb-Component: diablo-d5
+XCBS-Rcb-Component: diablo-final
 
 Package: python-keystone
 Architecture: all

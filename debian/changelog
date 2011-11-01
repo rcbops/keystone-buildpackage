@@ -1,3 +1,10 @@
+keystone (2011.3-final-rcb1) natty; urgency=low
+
+  * update to github.com/openstack/keystone, revision
+    ec3ff092c1acb905e54d57c872821f1ab4fa0465 (tag rcb_v1.1)
+
+ -- RCB Builder <rcb-deploy@lists.rackspace.com>  Tue, 01 Nov 2011 16:45:21 -0500
+
 keystone (2011.3-d5-rcb8) natty; urgency=low
 
   * Add x-rcb-component in preparation for essex-e0 drop
@@ -48,11 +55,5 @@ keystone (2011.3-d5-rcb1) natty; urgency=low
     from https://github.com/rpedde/debians.git, revision
     74807909f14b247715c05e868bf70ed94f6c8bee
 
- -- root <build@syn-n04.lab>  Tue, 13 Sep 2011 23:40:11 -0500
-
-keystone (000-000-0000) maverick; urgency=low
-
-  * Initial Commit
-
- -- root <root@packaging>  Tue, 19 Jul 2011 22:21:31 +0000
+ -- RCB Builder <rcb-deploy@lists.rackspace.com>  Tue, 13 Sep 2011 23:40:11 -0500
 
