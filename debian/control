@@ -26,7 +26,8 @@ Homepage: https://github.com/rackspace/keystone
 XB-Python-Version: ${python:Versions}
 Depends: ${misc:Depends},
  ${python:Depends},
- python-lxml
+ python-lxml,
+ python-passlib
 Description: Identity Service of OpenStack
  .
  This package contains the python libraries
