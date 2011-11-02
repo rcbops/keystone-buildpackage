@@ -1,3 +1,9 @@
+keystone (2011.3-final-rcb2) natty; urgency=low
+
+  * add run-time dep for python-hashlib
+
+ -- RCB Builder <rcb-deploy@lists.rackspace.com>  Wed, 02 Nov 2011 16:10:51 -0500
+
 keystone (2011.3-final-rcb1) natty; urgency=low
 
   * update to github.com/openstack/keystone, revision
