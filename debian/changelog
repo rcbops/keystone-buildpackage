@@ -1,3 +1,9 @@
+keystone (2011.3-final-rcb3) natty; urgency=low
+
+  * add more verbose output on keystone-manage list users
+
+ -- RCB Builder <rcb-deploy@lists.rackspace.com>  Thu, 03 Nov 2011 11:12:16 -0500
+
 keystone (2011.3-final-rcb2) natty; urgency=low
 
   * add run-time dep for python-hashlib
