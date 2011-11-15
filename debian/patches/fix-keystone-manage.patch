@@ -1,0 +1,11 @@
+--- a/keystone/manage/__init__.py
++++ b/keystone/manage/__init__.py
+@@ -108,7 +108,7 @@
+ 
+     if len(args) == 2 and action not in ['list']:
+         raise optparse.OptParseError(ID_NOT_SPECIFIED)
+-    else:
++    elif action not in ['list']:
+         object_id = args[2]
+ 
+     # Helper functions

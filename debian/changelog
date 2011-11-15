@@ -1,3 +1,9 @@
+keystone (2011.3-final-rcb5) natty; urgency=low
+
+  * Update keystone to diablo/stable branch
+
+ -- RCB Builder <rcb-deploy@lists.rackspace.com>  Tue, 15 Nov 2011 13:33:31 -0600
+
 keystone (2011.3-final-rcb4) natty; urgency=low
 
   * add more verbose output on keystone-manage role list

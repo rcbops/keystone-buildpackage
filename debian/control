@@ -2,7 +2,7 @@ Source: keystone
 Section: python
 Priority: optional
 Maintainer: RCB Builder <rcb-deploy@lists.rackspace.com>
-Build-Depends: debhelper (>= 7.0.50),
+Build-Depends: debhelper (>= 8),
  python-all,
  python-all-dev,
  sqlite3
@@ -13,6 +13,7 @@ Build-Depends-Indep:
  python-pysqlite2,
  python-eventlet,
  python-sqlalchemy-ext | python-sqlalchemy ( << 0.6.3-2),
+ python-migrate,
  python-routes,
  python-webob,
  python-lxml
@@ -40,6 +41,7 @@ Depends: ${misc:Depends}, ${python:Depends}, python-keystone (= ${source:Version
  python-pastedeploy,
  python-eventlet,
  python-pysqlite2,
+ python-migrate,
  sqlite3,
  python-eventlet,
  python-sqlalchemy-ext | python-sqlalchemy ( << 0.6.3-2),
