@@ -1,3 +1,9 @@
+keystone (2011.3-final-rcb6) natty; urgency=low
+
+  * update log directory at Joe Breu's suggestion
+
+ -- RCB Builder <rcb-deploy@lists.rackspace.com>  Wed, 16 Nov 2011 14:30:14 -0600
+
 keystone (2011.3-final-rcb5) natty; urgency=low
 
   * Update keystone to diablo/stable branch

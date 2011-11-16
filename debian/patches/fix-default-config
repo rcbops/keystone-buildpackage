@@ -1,15 +1,14 @@
 --- a/etc/keystone.conf
 +++ b/etc/keystone.conf
-@@ -12,7 +12,7 @@
+@@ -12,6 +12,7 @@
  
  # Log to this file. Make sure you do not set the same log
  # file for both the API and registry servers!
--log_file = keystone.log
-+log_file = /var/log/keystone/keystone.log
++log_dir = /var/log/keystone
+ log_file = keystone.log
  
  # List of backends to be configured
- backends = keystone.backends.sqlalchemy
-@@ -51,7 +51,7 @@
+@@ -51,7 +52,7 @@
  # SQLAlchemy connection string for the reference implementation registry
  # server. Any valid SQLAlchemy connection string is fine.
  # See: http://bit.ly/ideIpI
