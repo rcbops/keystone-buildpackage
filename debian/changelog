@@ -1,3 +1,9 @@
+keystone (2011.3-final-rcb7) natty; urgency=low
+
+  * Fix packaging to include migration scripts (bug in MANIFEST.in)
+
+ -- RCB Builder <rcb-deploy@lists.rackspace.com>  Mon, 21 Nov 2011 16:10:10 -0600
+
 keystone (2011.3-final-rcb6) natty; urgency=low
 
   * update log directory at Joe Breu's suggestion
