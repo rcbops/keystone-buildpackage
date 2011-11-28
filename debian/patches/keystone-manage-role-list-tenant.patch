@@ -1,0 +1,32 @@
+--- a/keystone/backends/sqlalchemy/models.py
++++ b/keystone/backends/sqlalchemy/models.py
+@@ -87,6 +87,7 @@
+     __table_args__ = (UniqueConstraint("user_id", "role_id", "tenant_id"), {})
+ 
+     user = relationship('User')
++    role = relationship('Role')
+ 
+ 
+ class Endpoints(Base, KeystoneBase):
+--- a/keystone/manage/__init__.py
++++ b/keystone/manage/__init__.py
+@@ -167,7 +167,7 @@
+         if tenant:
+             # print with users
+             print 'Role assignments for tenant %s' % tenant
+-            print_table(('User', 'Role'), api.list_roles(tenant=tenant))
++            print_table(('UserId', 'User', 'RoleId', 'Role'), api.list_roles(tenant=tenant))
+         else:
+             # print without tenants
+             print_table(('id', 'name'), api.list_roles())
+--- a/keystone/manage/api.py
++++ b/keystone/manage/api.py
+@@ -64,7 +64,7 @@
+     objects = db_api.TENANT.get_role_assignments(tenant)
+     if objects == None:
+         raise IndexError("Assignments not found")
+-    return [[o.user_id, o.role_id] for o in objects]
++    return [[o.user_id, o.user.name, o.role_id, o.role.name] for o in objects]
+ 
+ 
+ def list_roles(tenant=None):

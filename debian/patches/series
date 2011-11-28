@@ -2,3 +2,5 @@ keystone-diablo-stable.patch
 fix-default-config
 fix-keystone-manage.patch
 distribute-migration-data.patch
+keystone-manage-credentials-list.patch
+keystone-manage-role-list-tenant.patch
