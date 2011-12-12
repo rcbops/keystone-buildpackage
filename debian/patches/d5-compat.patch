@@ -549,18 +549,18 @@ Change-Id: I050d77ee3acc9d91732b5099774d82d6492ec1ca
  
          return self.post_token(as_json=data, **kwargs)
  
-+   def authenticate_D5(self, user_name=None, user_password=None,
-+                       tenant_id=None, **kwargs):
-+       user_name = optional_str(user_name)
-+       user_password = optional_str(user_password)
++    def authenticate_D5(self, user_name=None, user_password=None,
++                        tenant_id=None, **kwargs):
++        user_name = optional_str(user_name)
++        user_password = optional_str(user_password)
 +
-+       data = {"passwordCredentials": {
-+               "username": user_name,
-+               "password": user_password}}
-+       if tenant_id:
-+           data["passwordCredentials"]["tenantId"] = tenant_id
++        data = {"passwordCredentials": {
++                "username": user_name,
++                "password": user_password}}
++        if tenant_id:
++            data["passwordCredentials"]["tenantId"] = tenant_id
 +
-+       return self.post_token(as_json=data, **kwargs)
++        return self.post_token(as_json=data, **kwargs)
 +
      def validate_token(self, token_id=None, tenant_id=None, **kwargs):
          token_id = optional_str(token_id)
