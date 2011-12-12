@@ -1,3 +1,10 @@
+keystone (2011.3-final-rcb9) natty; urgency=low
+
+  * add d5-compat middleware (openstack/keystone master,
+	b83a314b4b4eef39510240441704ea13f655ea9b)
+
+ -- RCB Builder <rcb-deploy@lists.rackspace.com>  Mon, 12 Dec 2011 16:13:44 -0600
+
 keystone (2011.3-final-rcb8) natty; urgency=low
 
   * add "keystone-manage credentials list" command

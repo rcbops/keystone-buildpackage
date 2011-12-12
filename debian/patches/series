@@ -1,4 +1,5 @@
 keystone-diablo-stable.patch
+d5-compat.patch
 fix-default-config
 fix-keystone-manage.patch
 distribute-migration-data.patch
