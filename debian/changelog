@@ -1,3 +1,9 @@
+keystone (2011.3-final-rcb10) natty; urgency=low
+
+  * fix d5-compat patch 
+
+ -- RCB Builder <rcb-deploy@lists.rackspace.com>  Mon, 12 Dec 2011 19:05:52 -0600
+
 keystone (2011.3-final-rcb9) natty; urgency=low
 
   * add d5-compat middleware (openstack/keystone master,
