@@ -29,7 +29,7 @@ Depends: ${misc:Depends},
  ${python:Depends},
  python-lxml,
  python-passlib
-Description: Identity Service of OpenStack
+Description: OpenStack Identity Service Libraries
  .
  This package contains the python libraries
 
@@ -46,6 +46,6 @@ Depends: ${misc:Depends}, ${python:Depends}, python-keystone (= ${source:Version
  python-eventlet,
  python-sqlalchemy-ext | python-sqlalchemy ( << 0.6.3-2),
  python-routes
-Description: Identity Service of OpenStack
+Description: OpenStack Identity Service
  .
  This package contains the daemons
