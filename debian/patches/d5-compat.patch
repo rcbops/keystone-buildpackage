@@ -417,7 +417,7 @@ Change-Id: I050d77ee3acc9d91732b5099774d82d6492ec1ca
 +                        else:
 +                            request.body = auth_with_credentials.to_json()
 +                        is_d5_request = True
-+                    finally:
++                    except:
 +                        pass
 +
 +                    if is_d5_request:
