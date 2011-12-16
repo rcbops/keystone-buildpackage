@@ -1,3 +1,9 @@
+keystone (2011.3-final-rcb12) natty; urgency=low
+
+  * add the d5_compat filter line
+
+ -- RCB Builder <rcb-deploy@lists.rackspace.com>  Fri, 16 Dec 2011 13:40:17 -0600
+
 keystone (2011.3-final-rcb11) natty; urgency=low
 
   * fix token auth for d5-compat
@@ -6,7 +12,7 @@ keystone (2011.3-final-rcb11) natty; urgency=low
 
 keystone (2011.3-final-rcb10) natty; urgency=low
 
-  * fix d5-compat patch 
+  * fix d5-compat patch
 
  -- RCB Builder <rcb-deploy@lists.rackspace.com>  Mon, 12 Dec 2011 19:05:52 -0600
 

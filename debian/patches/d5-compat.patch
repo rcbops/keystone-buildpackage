@@ -48,6 +48,15 @@ Change-Id: I050d77ee3acc9d91732b5099774d82d6492ec1ca
      RAX-KEY-extension
      service_api
  
+@@ -87,5 +89,8 @@
+ [filter:RAX-KEY-extension]
+ paste.filter_factory = keystone.contrib.extensions.service.raxkey.frontend:filter_factory
+ 
++[filter:d5_compat]
++paste.filter_factory = keystone.frontends.d5_compat:filter_factory
++
+ [filter:debug]
+ paste.filter_factory = keystone.common.wsgi:debug_filter_factory
 --- /dev/null
 +++ b/keystone/frontends/d5_compat.py
 @@ -0,0 +1,409 @@
