@@ -1,3 +1,9 @@
+keystone (2011.3-final-rcb14) natty; urgency=low
+
+  * Remove revisionist history style of patch
+
+ -- RCB Builder <rcb-deploy@lists.rackspace.com>  Tue, 20 Dec 2011 23:05:47 +0000
+
 keystone (2011.3-final-rcb13) natty; urgency=low
 
   * fix d5 compatibility (return correct service catalog
