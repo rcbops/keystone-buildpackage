@@ -59,7 +59,7 @@ Change-Id: I050d77ee3acc9d91732b5099774d82d6492ec1ca
  paste.filter_factory = keystone.common.wsgi:debug_filter_factory
 --- /dev/null
 +++ b/keystone/frontends/d5_compat.py
-@@ -0,0 +1,410 @@
+@@ -0,0 +1,409 @@
 +#!/usr/bin/env python
 +# vim: tabstop=4 shiftwidth=4 softtabstop=4
 +#
@@ -309,10 +309,9 @@ Change-Id: I050d77ee3acc9d91732b5099774d82d6492ec1ca
 +            else:
 +                raise fault.IdentityFault("%s not initialized with data" % \
 +                                          self.__class__.__str__)
-+        d5_data = {"auth": self.json.copy()}
-+        d5_data['auth']['serviceCatalog'] = \
-+            dict([(s['type'], s['endpoints']) 
-+                   for s in d5_data['auth']['serviceCatalog']])
++        d5_data = {"auth": {}}
++        for key, value in self.json.iteritems():
++            d5_data["auth"][key] = value
 +
 +        return json.dumps(d5_data)
 +
