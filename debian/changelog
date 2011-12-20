@@ -1,3 +1,9 @@
+keystone (2011.3-final-rcb13) natty; urgency=low
+
+  * fix d5_compat response to legacy auth
+
+ -- RCB Builder <rcb-deploy@lists.rackspace.com>  Tue, 20 Dec 2011 00:06:17 -0600
+
 keystone (2011.3-final-rcb12) natty; urgency=low
 
   * add the d5_compat filter line
