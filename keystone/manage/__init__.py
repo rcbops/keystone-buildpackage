@@ -163,7 +163,7 @@ def process(*args):
         tenant = optional_arg(args, 4)
         if api.grant_role(object_id, args[3], tenant):
             print("SUCCESS: Granted %s the %s role on %s." %
-                (object_id, args[3], tenant))
+                (args[3], object_id, tenant))
 
     elif (object_type, command) == ('endpointTemplates', 'add'):
         require_args(args, 9, "Missing arguments: endpointTemplates add "
