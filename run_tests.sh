@@ -7,7 +7,6 @@ function usage {
   echo "  -V, --virtual-env        Always use virtualenv.  Install automatically if not present"
   echo "  -N, --no-virtual-env     Don't use virtualenv.  Run tests in local environment"
   echo "  -f, --force              Force a clean re-build of the virtual environment. Useful when dependencies have been added."
-  echo "  --unittests-only         Run unit tests only, exclude functional tests."
   echo "  --with-coverage          Runs tests with python code coverage (useful for jenkins)"
   echo "                             Note: cannot be used in combination --with-progress"
   echo "  --with-progress          Runs tests with progress (useful for developers)"
@@ -27,23 +26,23 @@ function process_option {
     -h|--help) usage;;
     -V|--virtual-env) let always_venv=1; let never_venv=0;;
     -N|--no-virtual-env) let always_venv=0; let never_venv=1;;
-    -p|--pep8) let just_pep8=1; let never_venv=1;;
+    -p|--pep8) let just_pep8=1;;
     -l|--pylint) let just_pylint=1; let never_venv=0;;
     -f|--force) let force=1;;
-    --unittests-only) noseargs="$noseargs --exclude-dir=keystone/tests/functional --exclude-dir=keystone/tests/system";;
-    *) noseargs="$noseargs $1"
+    *) addlargs="$addlargs $1"
   esac
 }
 
-venv=.keystone-venv
+venv=.venv
 with_venv=tools/with_venv.sh
 always_venv=0
 never_venv=0
 force=0
-noseargs=
+addlargs=
 wrapper=""
 just_pep8=0
 just_pylint=0
+RUNTESTS="python run_tests.py $addlargs"
 
 for arg in "$@"; do
   process_option $arg
@@ -51,7 +50,7 @@ done
 
 function run_tests {
   # Just run the test suites in current environment
-  ${wrapper} $NOSETESTS
+  ${wrapper} $RUNTESTS
 }
 
 function run_pep8 {
@@ -59,20 +58,17 @@ function run_pep8 {
   PEP8_EXCLUDE="vcsversion.py"
   PEP8_OPTIONS="--exclude=$PEP8_EXCLUDE --repeat --show-pep8 --show-source"
   PEP8_INCLUDE="bin/k* keystone examples tools setup.py run_tests.py"
-  pep8 $PEP8_OPTIONS $PEP8_INCLUDE
+  ${wrapper} pep8 $PEP8_OPTIONS $PEP8_INCLUDE
 }
 
 function run_pylint {
   echo "Running pylint ..."
-  PYLINT_OPTIONS="--rcfile=.pylintrc --output-format=parseable"
+  PYLINT_OPTIONS="--rcfile=pylintrc --output-format=parseable"
   PYLINT_INCLUDE="keystone"
   echo "Pylint messages count: "
   pylint $PYLINT_OPTIONS $PYLINT_INCLUDE | grep 'keystone/' | wc -l
   echo "Run 'pylint $PYLINT_OPTIONS $PYLINT_INCLUDE' for a full report."
 }
-
-
-NOSETESTS="python run_tests.py $noseargs"
 
 if [ $never_venv -eq 0 ]
 then
@@ -94,7 +90,7 @@ then
       if [ "x$use_ve" = "xY" -o "x$use_ve" = "x" -o "x$use_ve" = "xy" ]; then
         # Install the virtualenv and run the test suite in it
         python tools/install_venv.py
-		    wrapper=${with_venv}
+        wrapper=${with_venv}
       fi
     fi
   fi
@@ -111,7 +107,3 @@ if [ $just_pylint -eq 1 ]; then
 fi
 
 run_tests || exit
-
-#if [ -z "$noseargs" ]; then
-#  run_pep8
-#fi
