@@ -20,32 +20,48 @@
 TOKEN-BASED AUTH MIDDLEWARE
 
 This WSGI component performs multiple jobs:
-- it verifies that incoming client requests have valid tokens by verifying
-    tokens with the auth service.
-- it will reject unauthenticated requests UNLESS it is in 'delay_auth_decision'
-    mode, which means the final decision is delegated to the downstream WSGI
-    component (usually the OpenStack service)
-- it will collect and forward identity information from a valid token
-    such as user name etc...
+
+* it verifies that incoming client requests have valid tokens by verifying
+  tokens with the auth service.
+* it will reject unauthenticated requests UNLESS it is in 'delay_auth_decision'
+  mode, which means the final decision is delegated to the downstream WSGI
+  component (usually the OpenStack service)
+* it will collect and forward identity information from a valid token
+  such as user name etc...
 
 Refer to: http://wiki.openstack.org/openstack-authn
 
 
 HEADERS
 -------
-Headers starting with HTTP_ is a standard http header
-Headers starting with HTTP_X is an extended http header
 
-> Coming in from initial call from client or customer
-HTTP_X_AUTH_TOKEN   : the client token being passed in
-HTTP_X_STORAGE_TOKEN: the client token being passed in (legacy Rackspace use)
-                      to support cloud files
-> Used for communication between components
-www-authenticate    : only used if this component is being used remotely
-HTTP_AUTHORIZATION  : basic auth password used to validate the connection
+* Headers starting with HTTP\_ is a standard http header
+* Headers starting with HTTP_X is an extended http header
 
-> What we add to the request for use by the OpenStack service
-HTTP_X_AUTHORIZATION: the client identity being passed in
+Coming in from initial call from client or customer
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+HTTP_X_AUTH_TOKEN
+    the client token being passed in
+
+HTTP_X_STORAGE_TOKEN
+    the client token being passed in (legacy Rackspace use) to support
+    cloud files
+
+Used for communication between components
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+www-authenticate
+    only used if this component is being used remotely
+
+HTTP_AUTHORIZATION
+    basic auth password used to validate the connection
+
+What we add to the request for use by the OpenStack service
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+HTTP_X_AUTHORIZATION
+    the client identity being passed in
 
 """
 
@@ -165,8 +181,18 @@ class AuthProtocol(object):
                 if claims:
                     self._decorate_request('X_AUTHORIZATION', "Proxy %s" %
                         claims['user'], env, proxy_headers)
+
+                    # For legacy compatibility before we had ID and Name
                     self._decorate_request('X_TENANT',
                         claims['tenant'], env, proxy_headers)
+
+                    # Services should use these
+                    self._decorate_request('X_TENANT_NAME',
+                        claims.get('tenant_name', claims['tenant']),
+                        env, proxy_headers)
+                    self._decorate_request('X_TENANT_ID',
+                        claims['tenant'], env, proxy_headers)
+
                     self._decorate_request('X_USER',
                         claims['user'], env, proxy_headers)
                     if 'roles' in claims and len(claims['roles']) > 0:
@@ -192,7 +218,8 @@ class AuthProtocol(object):
         validate a user's token. Validate_token is a priviledged call so
         it needs to be authenticated by a service that is calling it
         """
-        headers = {"Content-type": "application/json", "Accept": "text/json"}
+        headers = {"Content-type": "application/json",
+                   "Accept": "application/json"}
         params = {"passwordCredentials": {"username": username,
                                           "password": password,
                                           "tenantId": "1"}}
@@ -235,7 +262,7 @@ class AuthProtocol(object):
         # since this is a priviledged op,m we need to auth ourselves
         # by using an admin token
         headers = {"Content-type": "application/json",
-                    "Accept": "text/json",
+                    "Accept": "application/json",
                     "X-Auth-Token": self.admin_token}
                     ##TODO(ziad):we need to figure out how to auth to keystone
                     #since validate_token is a priviledged call
@@ -261,7 +288,7 @@ class AuthProtocol(object):
         # Valid token. Get user data and put it in to the call
         # so the downstream service can use it
         headers = {"Content-type": "application/json",
-                    "Accept": "text/json",
+                    "Accept": "application/json",
                     "X-Auth-Token": self.admin_token}
                     ##TODO(ziad):we need to figure out how to auth to keystone
                     #since validate_token is a priviledged call
@@ -288,13 +315,18 @@ class AuthProtocol(object):
 
         try:
             tenant = token_info['access']['token']['tenant']['id']
+            tenant_name = token_info['access']['token']['tenant']['name']
         except:
             tenant = None
+            tenant_name = None
         if not tenant:
             tenant = token_info['access']['user'].get('tenantId')
+            tenant_name = token_info['access']['user'].get('tenantName')
         verified_claims = {'user': token_info['access']['user']['username'],
                     'tenant': tenant,
                     'roles': roles}
+        if tenant_name:
+            verified_claims['tenantName'] = tenant_name
         return verified_claims
 
     def _decorate_request(self, index, value, env, proxy_headers):

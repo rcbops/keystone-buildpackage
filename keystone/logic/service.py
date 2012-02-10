@@ -42,6 +42,9 @@ class IdentityService(object):
     #  Token Operations
     #
     def authenticate(self, auth_request):
+        """ Authenticate the user based on the type of credentials passed in
+        and return a token, user info, and a service catalog"""
+
         # Check auth_with_password_credentials
         if not isinstance(auth_request, auth.AuthWithPasswordCredentials):
             raise fault.BadRequestFault(
@@ -64,7 +67,10 @@ class IdentityService(object):
             validate, user.id, auth_request.tenant_id)
 
     def authenticate_with_unscoped_token(self, auth_request):
-        # Check auth_with_unscoped_token
+        """ Authenticate the user using only the provided unscoped token
+        as credentials.
+        This is how a user with an unscoped token can get a scoped token
+        """
         if not isinstance(auth_request, auth.AuthWithUnscopedToken):
             raise fault.BadRequestFault("Expecting auth_with_unscoped_token!")
 
@@ -87,7 +93,9 @@ class IdentityService(object):
         return self._authenticate(validate, user.id, auth_request.tenant_id)
 
     def authenticate_ec2(self, credentials):
-        # Check credentials
+        """
+        Authenticate the user with their EC2 credentials
+        """
         if not isinstance(credentials, auth.Ec2Credentials):
             raise fault.BadRequestFault("Expecting Ec2 Credentials!")
 
@@ -147,19 +155,8 @@ class IdentityService(object):
 
     def validate_token(self, admin_token, token_id, belongs_to=None):
         self.__validate_service_or_keystone_admin_token(admin_token)
-
-        if not api.TOKEN.get(token_id):
-            raise fault.UnauthorizedFault("Bad token, please reauthenticate")
-        (token, user) = self.__validate_token(token_id, belongs_to)
+        (token, user) = self.__validate_token(token_id, belongs_to, True)
         return self.__get_validate_data(token, user)
-
-    def check_token(self, admin_token, token_id, belongs_to=None):
-        self.__validate_service_or_keystone_admin_token(admin_token)
-
-        if not api.TOKEN.get(token_id):
-            raise fault.UnauthorizedFault("Bad token, please reauthenticate")
-
-        self.__validate_token(token_id, belongs_to)
 
     def revoke_token(self, admin_token, token_id):
         self.__validate_admin_token(admin_token)
@@ -190,6 +187,11 @@ class IdentityService(object):
     #
 
     def create_tenant(self, admin_token, tenant):
+        """
+        Given a token with the right privileges (an admin token), create
+        a new tenant
+        """
+
         self.__validate_admin_token(admin_token)
 
         if not isinstance(tenant, Tenant):
@@ -247,6 +249,7 @@ class IdentityService(object):
         return Tenants(ts, links)
 
     def get_tenant(self, admin_token, tenant_id):
+        """ Get a single tenant based on the tenant id"""
         self.__validate_admin_token(admin_token)
 
         dtenant = api.TENANT.get(tenant_id)
@@ -392,7 +395,7 @@ class IdentityService(object):
         if not duser:
             raise fault.ItemNotFoundFault("The user could not be found")
         return User_Update(id=duser.id, tenant_id=duser.tenant_id,
-                email=duser.email, enabled=duser.enabled)
+                email=duser.email, enabled=duser.enabled, name=duser.name)
 
     def update_user(self, admin_token, user_id, user):
         self.__validate_admin_token(admin_token)
@@ -510,7 +513,7 @@ class IdentityService(object):
             ts.append(UserRole(drole_ref.role_id, drole.name,
                 drole_ref.tenant_id))
 
-        user = auth.User(duser.id, duser.name, None, UserRoles(ts, []))
+        user = auth.User(duser.id, duser.name, None, None, UserRoles(ts, []))
 
         return auth.AuthData(token, user, endpoints)
 
@@ -537,8 +540,14 @@ class IdentityService(object):
             ts.append(UserRole(drole_ref.role_id, drole.name,
                 drole_ref.tenant_id))
 
+        # Also get the user's tenant's name
+        tenant_name = None
+        if duser.tenant_id:
+            utenant = api.TENANT.get(duser.tenant_id)
+            tenant_name = utenant.name
+
         user = auth.User(duser.id, duser.name, duser.tenant_id,
-            UserRoles(ts, []))
+            tenant_name, UserRoles(ts, []))
 
         return auth.ValidateData(token, user)
 
@@ -568,17 +577,33 @@ class IdentityService(object):
 
         return self.__validate_tenant(dtenant)
 
-    def __validate_token(self, token_id, belongs_to=None):
+    def __validate_token(self, token_id, belongs_to=None, is_check_token=None):
+        """
+        Method to validate a token.
+        token_id -- value of actual token that need to be validated.
+        belngs_to -- optional tenant_id to check whether the token is
+        mapped to a specific tenant.
+        is_check_token -- optional argument that tells whether
+        we check the existence of a Token using another Token
+        to authenticate.This value decides the faults that are to be thrown.
+        """
         if not token_id:
             raise fault.UnauthorizedFault("Missing token")
 
         (token, user) = self.__get_dauth_data(token_id)
 
         if not token:
-            raise fault.ItemNotFoundFault("Bad token, please reauthenticate")
+            if is_check_token:
+                raise fault.ItemNotFoundFault("Token does not exist.")
+            else:
+                raise fault.UnauthorizedFault(
+                    "Bad token, please reauthenticate")
 
         if token.expires < datetime.now():
-            raise fault.ForbiddenFault("Token expired, please renew")
+            if is_check_token:
+                raise fault.ItemNotFoundFault("Token expired, please renew.")
+            else:
+                raise fault.ForbiddenFault("Token expired, please renew.")
 
         if not user.enabled:
             raise fault.UserDisabledFault("User %s has been disabled!"
