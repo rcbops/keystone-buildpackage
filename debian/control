@@ -19,7 +19,7 @@ Build-Depends-Indep:
  python-lxml
 XS-Python-Version: >=2.6
 Standards-Version: 3.9.1
-XCBS-Rcb-Component: diablo-final
+XCBS-Rcb-Component: essex-e3
 
 Package: python-keystone
 Architecture: all

@@ -1,8 +1,0 @@
---- a/MANIFEST.in
-+++ b/MANIFEST.in
-@@ -13,3 +13,4 @@
- graft tools
- graft keystone/content
- graft keystone/test/etc
-+graft keystone/backends/sqlalchemy/migrate_repo
-\ No newline at end of file

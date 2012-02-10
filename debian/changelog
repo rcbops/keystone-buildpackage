@@ -1,3 +1,10 @@
+keystone (2012.0+e3-rcb1) natty; urgency=low
+
+  * bump to essex-e3 from https://github.com/openstack/keystone.git,
+    revision 355d98ad3c2bd961402f682f5f1fb479274c3099
+
+ -- RCB Builder <rcb-deploy@lists.rackspace.com>  Fri, 10 Feb 2012 13:32:27 -0600
+
 keystone (2011.3-final-rcb14) natty; urgency=low
 
   * Remove revisionist history style of patch
