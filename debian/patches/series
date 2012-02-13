@@ -1,0 +1,5 @@
+d5-compat.patch
+d5-compat-return.patch
+fix-default-config
+keystone-manage-credentials-list.patch
+keystone-manage-role-list-tenant.patch

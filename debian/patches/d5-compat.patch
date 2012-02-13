@@ -1,0 +1,853 @@
+From b83a314b4b4eef39510240441704ea13f655ea9b Mon Sep 17 00:00:00 2001
+From: Ziad Sawalha <github@highbridgellc.com>
+Date: Tue, 6 Dec 2011 16:26:32 -0600
+Subject: [PATCH] D5 Compatibility Support
+
+Fixes bug 900916
+
+Added a D5-compat front-end for Keystone which responds in
+  D5 syntax if it receives a D5-formatted request.
+  It also formats responses to requests that can't be identified
+  as D5 or Diablo final in dual/compatible format (ugly, but works).
+
+This is intended to be around until Essex (maybe we deprecate sooner)
+
+Change-Id: I050d77ee3acc9d91732b5099774d82d6492ec1ca
+---
+ doc/source/keystone.conf.rst                     |    6 +-
+ etc/keystone.conf                                |   15 +-
+ etc/memcache.conf                                |    5 +
+ etc/ssl.conf                                     |    5 +
+ keystone/frontends/d5_compat.py                  |  411 ++++++++++++++++++++++
+ keystone/test/etc/ldap.conf.template             |    5 +
+ keystone/test/etc/memcache.conf.template         |    5 +
+ keystone/test/etc/sql.conf.template              |    5 +
+ keystone/test/etc/ssl.conf.template              |    5 +
+ keystone/test/functional/common.py               |   13 +
+ keystone/test/functional/test_d5_compat_calls.py |  114 ++++++
+ keystone/test/unit/test_d5_compat.py             |  159 +++++++++
+ 12 files changed, 742 insertions(+), 6 deletions(-)
+ create mode 100644 keystone/frontends/d5_compat.py
+ create mode 100644 keystone/test/functional/test_d5_compat_calls.py
+ create mode 100644 keystone/test/unit/test_d5_compat.py
+
+--- a/etc/keystone.conf
++++ b/etc/keystone.conf
+@@ -63,12 +63,14 @@
+ [pipeline:admin]
+ pipeline =
+     urlrewritefilter
++    d5_compat
+     admin_api
+ 
+ [pipeline:keystone-legacy-auth]
+ pipeline =
+     urlrewritefilter
+     legacy_auth
++    d5_compat
+     RAX-KEY-extension
+     service_api
+ 
+@@ -87,5 +89,8 @@
+ [filter:RAX-KEY-extension]
+ paste.filter_factory = keystone.contrib.extensions.service.raxkey.frontend:filter_factory
+ 
++[filter:d5_compat]
++paste.filter_factory = keystone.frontends.d5_compat:filter_factory
++
+ [filter:debug]
+ paste.filter_factory = keystone.common.wsgi:debug_filter_factory
+--- /dev/null
++++ b/keystone/frontends/d5_compat.py
+@@ -0,0 +1,409 @@
++#!/usr/bin/env python
++# vim: tabstop=4 shiftwidth=4 softtabstop=4
++#
++# Copyright (c) 2010-2011 OpenStack, LLC.
++#
++# Licensed under the Apache License, Version 2.0 (the "License");
++# you may not use this file except in compliance with the License.
++# You may obtain a copy of the License at
++#
++#    http://www.apache.org/licenses/LICENSE-2.0
++#
++# Unless required by applicable law or agreed to in writing, software
++# distributed under the License is distributed on an "AS IS" BASIS,
++# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
++# implied.
++# See the License for the specific language governing permissions and
++# limitations under the License.
++
++"""
++D5 API Compatibility Module
++
++This WSGI component adds support for the D5 API contract. That contract was
++an unofficial contract that made it into live deployments in the wild, so
++this middleware is an attempt to support production deployemnts of that
++code and allow them to interoperate with Keystone trunk while gradually moving
++to updated Keystone code.
++
++The middleware transforms responses in this way:
++- POST /tokens that come in D5 format (not wrapped in "auth":{}) will receive
++  a D5 formatted response (wrapped in "auth":{} instead of "access":{})
++- GET /tokens/{id} will respond with both an "auth" and an "access" wrapper
++  (since we can't tell if the caller is expecting a D5 or Diablo final
++  response)
++
++Notes:
++- GET /tokens will not repond in D5 syntax in XML (because only one root
++  can exist in XML and I chose not to break Diablo)
++- This relies on the URL normalizer (middlewre/url.py) to set
++  KEYSTONE_API_VERSION. Without that set to '2.0', this middleware does
++  nothing
++"""
++
++import copy
++import json
++from lxml import etree
++import os
++import sys
++
++from webob.exc import Request
++
++POSSIBLE_TOPDIR = os.path.normpath(os.path.join(os.path.abspath(sys.argv[0]),
++                                   os.pardir,
++                                   os.pardir,
++                                   os.pardir))
++if os.path.exists(os.path.join(POSSIBLE_TOPDIR, 'keystone', '__init__.py')):
++    sys.path.insert(0, POSSIBLE_TOPDIR)
++
++from keystone.logic.types import fault
++import keystone.utils as utils
++
++PROTOCOL_NAME = "D5 API Compatibility"
++
++
++class D5AuthBase(object):
++    """ Handles validating json and XML syntax of auth requests """
++
++    def __init__(self, tenant_id=None, tenant_name=None):
++        self.tenant_id = tenant_id
++        self.tenant_name = tenant_name
++
++    @staticmethod
++    def _validate_auth(obj, *valid_keys):
++        root = obj.keys()[0]
++
++        for key in root:
++            if not key in valid_keys:
++                raise fault.BadRequestFault('Invalid attribute(s): %s' % key)
++
++        if root.get('tenantId') and root.get('tenantName'):
++            raise fault.BadRequestFault(
++                'Expecting either Tenant ID or Tenant Name, but not both')
++
++        return root
++
++    @staticmethod
++    def _validate_key(obj, key, required_keys, optional_keys):
++        if not key in obj:
++            raise fault.BadRequestFault('Expecting %s' % key)
++
++        ret = obj[key]
++
++        for skey in ret:
++            if not skey in required_keys and not skey in optional_keys:
++                raise fault.BadRequestFault('Invalid attribute(s): %s' % skey)
++
++        for required_key in required_keys:
++            if not ret.get(required_key):
++                raise fault.BadRequestFault('Expecting %s:%s' %
++                                            (key, required_key))
++        return ret
++
++
++class D5AuthWithPasswordCredentials(D5AuthBase):
++    def __init__(self, username, password, tenant_id=None, tenant_name=None):
++        super(D5AuthWithPasswordCredentials, self).__init__(tenant_id,
++                                                          tenant_name)
++        self.username = username
++        self.password = password
++
++    @staticmethod
++    def from_xml(xml_str):
++        try:
++            dom = etree.Element("root")
++            dom.append(etree.fromstring(xml_str))
++            password_credentials = \
++                dom.find("{http://docs.openstack.org/identity/api/v2.0}"
++                "passwordCredentials")
++            if password_credentials is None:
++                raise fault.BadRequestFault("Expecting passwordCredentials")
++            tenant_id = password_credentials.get("tenantId")
++            tenant_name = password_credentials.get("tenantName")
++            username = password_credentials.get("username")
++            utils.check_empty_string(username, "Expecting a username")
++            password = password_credentials.get("password")
++            utils.check_empty_string(password, "Expecting a password")
++
++            if tenant_id and tenant_name:
++                raise fault.BadRequestFault(
++                    "Expecting either Tenant ID or Tenant Name, but not both")
++
++            return D5AuthWithPasswordCredentials(username, password,
++                                                  tenant_id, tenant_name)
++        except etree.LxmlError as e:
++            raise fault.BadRequestFault("Cannot parse passwordCredentials",
++                                        str(e))
++
++    @staticmethod
++    def from_json(json_str):
++        try:
++            obj = json.loads(json_str)
++
++            cred = D5AuthBase._validate_key(obj, 'passwordCredentials',
++                                    required_keys=['username', 'password'],
++                                    optional_keys=['tenantId', 'tenantName'])
++
++            return D5AuthWithPasswordCredentials(cred['username'],
++                                               cred['password'],
++                                               cred.get('tenantId'),
++                                               cred.get('tenantName'))
++        except (ValueError, TypeError) as e:
++            raise fault.BadRequestFault("Cannot parse passwordCredentials",
++                                        str(e))
++
++    def to_json(self):
++        """ Format the response in Diablo/Stable contract format """
++        data = {"auth": {"passwordCredentials": {
++            "username": self.username,
++            "password": self.password}}}
++        if self.tenant_id:
++            data["auth"]["tenantId"] = self.tenant_id
++        else:
++            if self.tenant_name:
++                data["auth"]["tenant_name"] = self.tenant_name
++        return json.dumps(data)
++
++    def to_xml(self):
++        """ Format the response in Diablo/Stable contract format """
++        dom = etree.Element("auth",
++            xmlns="http://docs.openstack.org/identity/api/v2.0")
++
++        password_credentials = etree.Element("passwordCredentials",
++            username=self.username,
++            password=self.password)
++
++        if self.tenant_id:
++            dom.set("tenantId", self.tenant_id)
++        else:
++            if self.tenant_name:
++                dom.set("tenant_name", self.tenant_name)
++
++        dom.append(password_credentials)
++
++        return etree.tostring(dom)
++
++
++class D5toDiabloAuthData(object):
++    """Authentation Information returned upon successful login.
++
++        This class handles rendering to JSON and XML. It renders
++        the token, the user data, the roles, and the service catalog.
++    """
++    xml = None
++    json = None
++
++    def __init__(self, init_json=None, init_xml=None):
++        if init_json:
++            self.json = init_json
++        if init_xml is not None:
++            self.xml = init_xml
++
++    @staticmethod
++    def from_xml(xml_str):
++        """ Verify Diablo syntax and return class initialized with data"""
++        try:
++            dom = etree.Element("root")
++            dom.append(etree.fromstring(xml_str))
++            root = \
++                dom.find("{http://docs.openstack.org/identity/api/v2.0}"
++                "access")
++            if root is None:
++                raise fault.BadRequestFault("Expecting access")
++            return D5toDiabloAuthData(init_xml=root)
++        except etree.LxmlError as e:
++            raise fault.BadRequestFault("Cannot parse Diablo response",
++                                        str(e))
++
++    @staticmethod
++    def from_json(json_str):
++        """ Verify Diablo syntax and return class initialized with data"""
++        try:
++            obj = json.loads(json_str)
++            auth = obj["access"]
++            return D5toDiabloAuthData(init_json=auth)
++        except (ValueError, TypeError) as e:
++            raise fault.BadRequestFault("Cannot parse auth response",
++                                        str(e))
++
++    def to_xml(self):
++        """ Convert to D5 syntax from Diablo"""
++        if self.xml is None:
++            if self.json is None:
++                raise NotImplementedError
++            else:
++                raise fault.IdentityFault("%s not initialized with data" % \
++                                          self.__class__.__str__)
++        dom = etree.Element("auth",
++            xmlns="http://docs.openstack.org/identity/api/v2.0")
++        for element in self.xml:
++            dom.append(element)
++        return etree.tostring(dom)
++
++    def to_json(self):
++        """ Convert to D5 syntax from Diablo"""
++        if self.json is None:
++            if self.xml is None:
++                raise NotImplementedError
++            else:
++                raise fault.IdentityFault("%s not initialized with data" % \
++                                          self.__class__.__str__)
++        d5_data = {"auth": {}}
++        for key, value in self.json.iteritems():
++            d5_data["auth"][key] = value
++
++        return json.dumps(d5_data)
++
++
++class D5ValidateData(object):
++    """Authentation Information returned upon successful token validation."""
++    xml = None
++    json = None
++
++    def __init__(self, init_json=None, init_xml=None):
++        if init_json:
++            self.json = init_json
++        if init_xml is not None:
++            self.xml = init_xml
++
++    @staticmethod
++    def from_xml(xml_str):
++        """ Verify Diablo syntax and return class initialized with data"""
++        try:
++            dom = etree.Element("root")
++            dom.append(etree.fromstring(xml_str))
++            root = \
++                dom.find("{http://docs.openstack.org/identity/api/v2.0}"
++                "access")
++            if root is None:
++                raise fault.BadRequestFault("Expecting access")
++            return D5ValidateData(init_xml=root)
++        except etree.LxmlError as e:
++            raise fault.BadRequestFault("Cannot parse Diablo response",
++                                        str(e))
++
++    @staticmethod
++    def from_json(json_str):
++        """ Verify Diablo syntax and return class initialized with data"""
++        try:
++            obj = json.loads(json_str)
++            return D5ValidateData(init_json=obj)
++        except (ValueError, TypeError) as e:
++            raise fault.BadRequestFault("Cannot parse auth response",
++                                        str(e))
++
++    def to_xml(self):
++        """ Returns only Diablo syntax (can only have one root in XML)
++
++        This middleware is designed to provide D5 compatibility but NOT
++        at the expense of breaking the Diablo contract."""
++        if self.xml is None:
++            if self.json is None:
++                raise NotImplementedError
++            else:
++                raise fault.IdentityFault("%s not initialized with data" % \
++                                          self.__class__.__str__)
++        return etree.tostring(self.xml)
++
++    def to_json(self):
++        """ Returns both Diablo and D5 syntax ("access" and "auth")"""
++        if self.json is None:
++            if self.xml is None:
++                raise NotImplementedError
++            else:
++                raise fault.IdentityFault("%s not initialized with data" % \
++                                          self.__class__.__str__)
++        d5_data = self.json.copy()
++        auth = {}
++        for key, value in self.json["access"].iteritems():
++            auth[key] = copy.copy(value)
++        if "user" in auth:
++            user = auth["user"]
++            del user["id"]
++            if "roles" in auth["user"]:
++                auth["user"]["roleRefs"] = []
++                rolerefs = auth["user"]["roleRefs"]
++                for role in auth["user"]["roles"]:
++                    ref = {}
++                    ref["id"] = role["id"]
++                    ref["roleId"] = role["name"]
++                    if "tenantId" in role:
++                        ref["tenantId"] = role["tenantId"]
++                    rolerefs.append(ref)
++                del auth["user"]["roles"]
++        d5_data["auth"] = auth
++
++        return json.dumps(d5_data)
++
++
++class D5AuthProtocol(object):
++    """D5 Cmpatibility Middleware that transforms client calls and responses"""
++
++    def __init__(self, app, conf):
++        """ Common initialization code """
++        print "Starting the %s component" % PROTOCOL_NAME
++        self.conf = conf
++        self.app = app
++
++    def __call__(self, env, start_response):
++        """ Handle incoming request. Transform. And send downstream. """
++        request = Request(env)
++        if 'KEYSTONE_API_VERSION' in env and \
++                                    env['KEYSTONE_API_VERSION'] == '2.0':
++            if request.path.startswith("/tokens"):
++                is_d5_request = False
++                if request.method == "POST":
++                    try:
++                        auth_with_credentials = \
++                            utils.get_normalized_request_content(
++                            D5AuthWithPasswordCredentials, request)
++                        # Convert request body to Diablo syntax
++                        if request.content_type == "application/xml":
++                            request.body = auth_with_credentials.to_xml()
++                        else:
++                            request.body = auth_with_credentials.to_json()
++                        is_d5_request = True
++                    except:
++                        pass
++
++                    if is_d5_request:
++                        response = request.get_response(self.app)
++                        #Handle failures.
++                        if not str(response.status).startswith('20'):
++                            return response(env, start_response)
++                        auth_data = utils.get_normalized_request_content(
++                            D5toDiabloAuthData, response)
++                        resp = utils.send_result(response.status_int, request,
++                                                 auth_data)
++                        return resp(env, start_response)
++                    else:
++                        # Pass through
++                        return self.app(env, start_response)
++
++                elif request.method == "GET":
++                    if request.path.endswith("/endpoints"):
++                        # Pass through
++                        return self.app(env, start_response)
++                    else:
++                        response = request.get_response(self.app)
++                        #Handle failures.
++                        if not str(response.status).startswith('20'):
++                            return response(env, start_response)
++                        validate_data = utils.get_normalized_request_content(
++                            D5ValidateData, response)
++                        resp = utils.send_result(response.status_int, request,
++                                                 validate_data)
++                        return resp(env, start_response)
++
++        # All other calls pass to downstream WSGI component
++        return self.app(env, start_response)
++
++
++def filter_factory(global_conf, **local_conf):
++    """Returns a WSGI filter app for use with paste.deploy."""
++    conf = global_conf.copy()
++    conf.update(local_conf)
++
++    def auth_filter(wsgiapp):
++        """Closure to return"""
++        return D5AuthProtocol(wsgiapp, conf)
++    return auth_filter
+--- a/keystone/test/etc/ldap.conf.template
++++ b/keystone/test/etc/ldap.conf.template
+@@ -30,12 +30,14 @@
+ [pipeline:admin]
+ pipeline =
+ 	urlrewritefilter
++	d5_compat
+ 	admin_api
+ 
+ [pipeline:keystone-legacy-auth]
+ pipeline =
+ 	urlrewritefilter
+ 	legacy_auth
++	d5_compat
+ 	RAX-KEY-extension
+ 	service_api
+ 
+@@ -48,6 +50,9 @@
+ [filter:urlrewritefilter]
+ paste.filter_factory = keystone.middleware.url:filter_factory
+ 
++[filter:d5_compat]
++paste.filter_factory = keystone.frontends.d5_compat:filter_factory
++
+ [filter:legacy_auth]
+ paste.filter_factory = keystone.frontends.legacy_token_auth:filter_factory
+ 
+--- a/keystone/test/etc/memcache.conf.template
++++ b/keystone/test/etc/memcache.conf.template
+@@ -28,12 +28,14 @@
+ [pipeline:admin]
+ pipeline =
+ 	urlrewritefilter
++	d5_compat
+ 	admin_api
+ 
+ [pipeline:keystone-legacy-auth]
+ pipeline =
+ 	urlrewritefilter
+ 	legacy_auth
++	d5_compat
+ 	RAX-KEY-extension
+ 	service_api
+ 
+@@ -46,6 +48,9 @@
+ [filter:urlrewritefilter]
+ paste.filter_factory = keystone.middleware.url:filter_factory
+ 
++[filter:d5_compat]
++paste.filter_factory = keystone.frontends.d5_compat:filter_factory
++
+ [filter:legacy_auth]
+ paste.filter_factory = keystone.frontends.legacy_token_auth:filter_factory
+ 
+--- a/keystone/test/etc/sql.conf.template
++++ b/keystone/test/etc/sql.conf.template
+@@ -24,12 +24,14 @@
+ [pipeline:admin]
+ pipeline =
+ 	urlrewritefilter
++	d5_compat
+ 	admin_api
+ 
+ [pipeline:keystone-legacy-auth]
+ pipeline =
+ 	urlrewritefilter
+ 	legacy_auth
++	d5_compat
+ 	RAX-KEY-extension
+ 	service_api
+ 
+@@ -42,6 +44,9 @@
+ [filter:urlrewritefilter]
+ paste.filter_factory = keystone.middleware.url:filter_factory
+ 
++[filter:d5_compat]
++paste.filter_factory = keystone.frontends.d5_compat:filter_factory
++
+ [filter:legacy_auth]
+ paste.filter_factory = keystone.frontends.legacy_token_auth:filter_factory
+ 
+--- a/keystone/test/functional/common.py
++++ b/keystone/test/functional/common.py
+@@ -532,6 +532,19 @@
+ 
+         return self.post_token(as_json=data, **kwargs)
+ 
++    def authenticate_D5(self, user_name=None, user_password=None,
++                        tenant_id=None, **kwargs):
++        user_name = optional_str(user_name)
++        user_password = optional_str(user_password)
++
++        data = {"passwordCredentials": {
++                "username": user_name,
++                "password": user_password}}
++        if tenant_id:
++            data["passwordCredentials"]["tenantId"] = tenant_id
++
++        return self.post_token(as_json=data, **kwargs)
++
+     def validate_token(self, token_id=None, tenant_id=None, **kwargs):
+         token_id = optional_str(token_id)
+ 
+--- /dev/null
++++ b/keystone/test/functional/test_d5_compat_calls.py
+@@ -0,0 +1,114 @@
++# vim: tabstop=4 shiftwidth=4 softtabstop=4
++# Copyright (c) 2010-2011 OpenStack, LLC.
++#
++# Licensed under the Apache License, Version 2.0 (the "License");
++# you may not use this file except in compliance with the License.
++# You may obtain a copy of the License at
++#
++#    http://www.apache.org/licenses/LICENSE-2.0
++#
++# Unless required by applicable law or agreed to in writing, software
++# distributed under the License is distributed on an "AS IS" BASIS,
++# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
++# implied.
++# See the License for the specific language governing permissions and
++# limitations under the License.
++
++
++import unittest2 as unittest
++
++from keystone.test.functional import common
++
++
++class D5_AuthenticationTest(common.FunctionalTestCase):
++    """ Tests the functionality of the D5 compat module """
++    def setUp(self, *args, **kwargs):
++        super(D5_AuthenticationTest, self).setUp(*args, **kwargs)
++
++        password = common.unique_str()
++        self.tenant = self.create_tenant().json['tenant']
++        self.user = self.create_user(user_password=password,
++            tenant_id=self.tenant['id']).json['user']
++        self.user['password'] = password
++
++        self.services = {}
++        self.endpoint_templates = {}
++        self.services = self.create_service().json['OS-KSADM:service']
++        self.endpoint_templates = self.create_endpoint_template(
++            name=self.services['name'], \
++            type=self.services['type']).\
++            json['OS-KSCATALOG:endpointTemplate']
++        self.create_endpoint_for_tenant(self.tenant['id'],
++        self.endpoint_templates['id'])
++
++    def test_authenticate_for_a_tenant(self):
++        r = self.authenticate_D5(self.user['name'], self.user['password'],
++            self.tenant['id'], assert_status=200)
++
++        self.assertIsNotNone(r.json['auth']['token'])
++        service_catalog = r.json['auth']['serviceCatalog']
++        self.assertIsNotNone(service_catalog)
++        self.check_urls_for_regular_user(service_catalog)
++
++    def test_authenticate_for_a_tenant_xml(self):
++        data = ('<?xml version="1.0" encoding="UTF-8"?> '
++            '<passwordCredentials xmlns="%s" tenantId="%s"'
++            ' username="%s" password="%s" '
++            '/>') % (
++            self.xmlns, self.tenant['id'],
++            self.user['name'], self.user['password'])
++        r = self.post_token(as_xml=data, assert_status=200)
++
++        self.assertEquals(r.xml.tag, '{%s}auth' % self.xmlns)
++        service_catalog = r.xml.find('{%s}serviceCatalog' % self.xmlns)
++        self.check_urls_for_regular_user_xml(service_catalog)
++
++    def test_authenticate_for_a_tenant_on_admin_api(self):
++        r = self.authenticate_D5(self.user['name'], self.user['password'],
++            self.tenant['id'], assert_status=200, request_type='admin')
++
++        self.assertIsNotNone(r.json['auth']['token'])
++        self.assertIsNotNone(r.json['auth']['serviceCatalog'])
++        service_catalog = r.json['auth']['serviceCatalog']
++        self.check_urls_for_regular_user(service_catalog)
++
++    def test_authenticate_for_a_tenant_xml_on_admin_api(self):
++        data = ('<?xml version="1.0" encoding="UTF-8"?> '
++            '<passwordCredentials xmlns="%s" tenantId="%s"'
++            ' username="%s" password="%s" '
++            '/>') % (
++            self.xmlns, self.tenant['id'],
++            self.user['name'], self.user['password'])
++        r = self.post_token(as_xml=data, assert_status=200,
++                request_type='admin')
++
++        self.assertEquals(r.xml.tag, '{%s}auth' % self.xmlns)
++        service_catalog = r.xml.find('{%s}serviceCatalog' % self.xmlns)
++        self.check_urls_for_regular_user_xml(service_catalog)
++
++    def test_authenticate_user_disabled(self):
++        self.disable_user(self.user['id'])
++        self.authenticate_D5(self.user['name'], self.user['password'],
++            self.tenant['id'], assert_status=403)
++
++    def test_authenticate_user_wrong(self):
++        data = {"passwordCredentials": {
++                    "username-field-completely-wrong": self.user['name'],
++                    "password": self.user['password'],
++                    "tenantId": self.tenant['id']}}
++        self.post_token(as_json=data, assert_status=400)
++
++    def test_authenticate_user_wrong_xml(self):
++        data = ('<?xml version="1.0" encoding="UTF-8"?> '
++            '<passwordCredentials '
++            'xmlns="http://docs.openstack.org/identity/api/v2.0" '
++            'usernamefieldcompletelywrong="%s" '
++            'password="%s" '
++            'tenantId="%s"/>') % (
++                self.user['name'], self.user['password'], self.tenant['id'])
++
++        self.post_token(as_xml=data, assert_status=400)
++
++
++if __name__ == '__main__':
++    unittest.main()
+--- /dev/null
++++ b/keystone/test/unit/test_d5_compat.py
+@@ -0,0 +1,159 @@
++import json
++import unittest2 as unittest
++from keystone.frontends import d5_compat
++import keystone.logic.types.fault as fault
++
++
++class TestD5Auth(unittest.TestCase):
++    """Test to make sure Keystone honors the 'unofficial' D5 API contract.
++
++    The main differences were:
++        - POST /v2.0/tokens without the "auth" wrapper
++        - POST /v2.0/tokens with tenantId in the passwordCredentials object
++          (instead of the auth wrapper)
++        - Response for validate token was wrapped in "auth"
++
++    TODO(zns): deprecate this once we move to the next version of the API
++    """
++
++    pwd_xml = '<?xml version="1.0" encoding="UTF-8"?>\
++                <passwordCredentials\
++                xmlns="http://docs.openstack.org/identity/api/v2.0" \
++                password="secret" username="disabled" \
++                />'
++
++    def test_pwd_cred_marshall(self):
++        creds = d5_compat.D5AuthWithPasswordCredentials.from_xml(self.pwd_xml)
++        self.assertEqual(creds.password, "secret")
++        self.assertEqual(creds.username, "disabled")
++
++    def test_pwd_creds_from_json(self):
++        data = json.dumps({"passwordCredentials":
++                                {"username": "foo", "password": "bar"}})
++        creds = d5_compat.D5AuthWithPasswordCredentials.from_json(data)
++        self.assertEqual(creds.username, "foo")
++        self.assertEqual(creds.password, "bar")
++        self.assertIsNone(creds.tenant_id)
++        self.assertIsNone(creds.tenant_name)
++
++    def test_pwd_creds_with_tenant_from_json(self):
++        data = json.dumps({"passwordCredentials":
++                                {"tenantName": "blaa", "username": "foo",
++                                 "password": "bar"}})
++        creds = d5_compat.D5AuthWithPasswordCredentials.from_json(data)
++        self.assertEqual(creds.username, "foo")
++        self.assertEqual(creds.password, "bar")
++        self.assertIsNone(creds.tenant_id)
++        self.assertEqual(creds.tenant_name, "blaa")
++
++    def test_pwd_creds_with_tenant_from_json(self):
++        data = json.dumps({"passwordCredentials":
++                                {"tenantId": "blaa", "username": "foo",
++                                 "password": "bar"}})
++        creds = d5_compat.D5AuthWithPasswordCredentials.from_json(data)
++        self.assertEqual(creds.username, "foo")
++        self.assertEqual(creds.password, "bar")
++        self.assertEqual(creds.tenant_id, "blaa")
++        self.assertIsNone(creds.tenant_name)
++
++    def test_pwd_not_both_tenant_from_json(self):
++        data = json.dumps({"tenantId": "blaa", "tenantName": "aalb"})
++        self.assertRaisesRegexp(fault.BadRequestFault,
++                            "Expecting passwordCredentials",
++                            d5_compat.D5AuthWithPasswordCredentials.from_json,
++                            data)
++
++    def test_pwd_no_creds_from_json(self):
++        data = json.dumps({"auth": {}})
++        self.assertRaisesRegexp(fault.BadRequestFault,
++                            "Expecting passwordCredentials",
++                            d5_compat.D5AuthWithPasswordCredentials.from_json,
++                            data)
++
++    def test_pwd_invalid_attribute_from_json(self):
++        data = json.dumps({"passwordCredentials": {"foo": "bar"}})
++        self.assertRaisesRegexp(fault.BadRequestFault,
++                            "Invalid",
++                            d5_compat.D5AuthWithPasswordCredentials.from_json,
++                            data)
++
++    def test_pwd_no_username_from_json(self):
++        data = json.dumps({"passwordCredentials": {}})
++        self.assertRaisesRegexp(fault.BadRequestFault,
++                            "Expecting passwordCredentials:username",
++                            d5_compat.D5AuthWithPasswordCredentials.from_json,
++                            data)
++
++    def test_pwd_no_password_from_json(self):
++        data = json.dumps({"passwordCredentials":
++                                        {"username": "foo"}})
++        self.assertRaisesRegexp(fault.BadRequestFault,
++                            "Expecting passwordCredentials:password",
++                            d5_compat.D5AuthWithPasswordCredentials.from_json,
++                            data)
++
++    def test_pwd_invalid_creds_attribute_from_json(self):
++        data = json.dumps({"passwordCredentials": {"bar": "foo"}})
++        self.assertRaisesRegexp(fault.BadRequestFault,
++                            "Invalid",
++                            d5_compat.D5AuthWithPasswordCredentials.from_json,
++                            data)
++
++    def test_json_pwd_creds_from_D5(self):
++        D5_data = json.dumps({"passwordCredentials":
++                                {"username": "foo", "password": "bar"}})
++        diablo_data = json.dumps({"auth": {"passwordCredentials":
++                                {"username": "foo", "password": "bar"}}})
++        creds = d5_compat.D5AuthWithPasswordCredentials.from_json(D5_data)
++        diablo = creds.to_json()
++        self.assertEquals(diablo, diablo_data)
++
++    def test_json_authdata_from_D5(self):
++        pass
++
++    def test_json_validatedata_from_D5(self):
++        diablo_data = {
++            "access": {
++                "token": {
++                    "expires": "2011-12-07T21:31:49.215675",
++                    "id": "92c8962a-7e9b-40d1-83eb-a2f3b6eb45c3"
++                },
++                "user": {
++                    "id": "3",
++                    "name": "admin",
++                    "roles": [
++                        {
++                            "id": "1",
++                            "name": "Admin"
++                        }
++                    ],
++                    "username": "admin"
++                }
++            }
++        }
++        D5_data = {"auth": {
++                "token": {
++                    "expires": "2011-12-07T21:31:49.215675",
++                    "id": "92c8962a-7e9b-40d1-83eb-a2f3b6eb45c3"
++                },
++                "user": {
++                    "roleRefs": [
++                        {
++                            "id": "1",
++                            "roleId": "Admin"
++                        }
++                    ],
++                    "username": "admin"
++                }
++            }
++        }
++        creds = d5_compat.D5ValidateData.from_json(json.dumps(diablo_data))
++        D5 = json.loads(creds.to_json())
++        self.assertEquals(diablo_data['access'], D5['access'],
++                      "D5 compat response must contain Diablo format")
++        self.assertEquals(D5_data['auth'], D5['auth'],
++                      "D5 compat response must contain D5 format")
++
++
++if __name__ == '__main__':
++    unittest.main()
