@@ -1,3 +1,9 @@
+keystone (2011.3-final-rcb15) natty; urgency=low
+
+  * Bump version
+
+ -- RCB Builder <rcb-deploy@lists.rackspace.com>  Thu, 16 Feb 2012 09:14:26 -0600
+
 keystone (2011.3-final-rcb14) natty; urgency=low
 
   * Remove revisionist history style of patch
