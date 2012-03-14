@@ -16,6 +16,7 @@ DEB_PYTHON_SYSTEM=pysupport
 
 override_dh_install:
 	dh_install
+	ls -lR
 
 ifeq (,$(findstring nocheck, $(DEB_BUILD_OPTIONS)))
 override_dh_auto_test:
