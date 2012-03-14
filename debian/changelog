@@ -1,3 +1,9 @@
+keystone (2012.0+e3-rcb2) natty; urgency=low
+
+  * bump version, fix packaging files
+
+ -- RCB Builder <rcb-deploy@lists.rackspace.com>  Wed, 14 Mar 2012 10:05:31 -0700
+
 keystone (2012.0+e3-rcb1) natty; urgency=low
 
   * bump to essex-e3 from https://github.com/openstack/keystone.git,
